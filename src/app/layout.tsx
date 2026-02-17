@@ -15,9 +15,12 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Wantry - Personal Wishlist & Price Tracker",
+  title: "Wantry",
   description:
     "Track your wishlists, monitor price changes, and never miss a deal.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

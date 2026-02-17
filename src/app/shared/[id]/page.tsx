@@ -2,19 +2,7 @@ import { Heart } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Priority } from "@/types";
-
-const priorityLabels: Record<number, string> = {
-  1: "Low",
-  2: "Med",
-  3: "High",
-};
-
-const priorityColors: Record<number, string> = {
-  1: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  2: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-  3: "bg-red-500/10 text-red-600 border-red-500/20",
-};
+import { getCurrencySymbol } from "@/lib/utils";
 
 export default async function SharedWishlistPage({
   params,
@@ -44,7 +32,7 @@ export default async function SharedWishlistPage({
     );
   }
 
-  // Fetch active wishlist items (RLS public share policy allows this)
+  // Fetch active wishlist items
   const { data: items } = await supabase
     .from("wishlist_items")
     .select(
@@ -55,7 +43,7 @@ export default async function SharedWishlistPage({
     )
     .eq("user_id", profile.id)
     .eq("is_purchased", false)
-    .order("priority", { ascending: false });
+    .order("created_at", { ascending: false });
 
   const wishlistItems = items ?? [];
 
@@ -85,6 +73,7 @@ export default async function SharedWishlistPage({
               const tags = (item.item_tags ?? []).map((it: any) => it.tags).filter(Boolean);
               const currentPrice = item.current_price ? Number(item.current_price) : null;
               const originalPrice = item.original_price ? Number(item.original_price) : null;
+              const currSymbol = getCurrencySymbol(item.currency);
 
               return (
                 <Card
@@ -112,14 +101,14 @@ export default async function SharedWishlistPage({
                       <div className="flex items-baseline gap-1.5">
                         {currentPrice != null && (
                           <span className="font-semibold text-base">
-                            ${currentPrice.toFixed(2)}
+                            {currSymbol}{currentPrice.toFixed(2)}
                           </span>
                         )}
                         {originalPrice != null &&
                           currentPrice != null &&
                           originalPrice !== currentPrice && (
                             <span className="text-xs text-muted-foreground line-through">
-                              ${originalPrice.toFixed(2)}
+                              {currSymbol}{originalPrice.toFixed(2)}
                             </span>
                           )}
                       </div>
@@ -129,30 +118,24 @@ export default async function SharedWishlistPage({
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {item.priority > 0 && (
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] px-1.5 py-0 ${priorityColors[item.priority as Priority] ?? ""}`}
-                        >
-                          {priorityLabels[item.priority] ?? ""}
-                        </Badge>
-                      )}
-                      {tags.map((tag: { id: string; name: string; color: string }) => (
-                        <Badge
-                          key={tag.id}
-                          variant="secondary"
-                          className="text-[10px] px-1.5 py-0"
-                          style={{
-                            backgroundColor: `${tag.color}15`,
-                            color: tag.color,
-                            borderColor: `${tag.color}30`,
-                          }}
-                        >
-                          {tag.name}
-                        </Badge>
-                      ))}
-                    </div>
+                    {tags.length > 0 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {tags.map((tag: { id: string; name: string; color: string }) => (
+                          <Badge
+                            key={tag.id}
+                            variant="secondary"
+                            className="text-[10px] px-1.5 py-0"
+                            style={{
+                              backgroundColor: `${tag.color}15`,
+                              color: tag.color,
+                              borderColor: `${tag.color}30`,
+                            }}
+                          >
+                            {tag.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </Card>
               );

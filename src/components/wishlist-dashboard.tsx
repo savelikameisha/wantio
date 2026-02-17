@@ -1,20 +1,23 @@
 "use client";
 
 import { useState } from "react";
-import { Search } from "lucide-react";
+import { Search, Heart, Plus, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { FloatingNav } from "@/components/floating-nav";
 import { ProductCard } from "@/components/product-card";
 import { AddItemModal } from "@/components/add-item-modal";
 import { PurchasedView } from "@/components/purchased-view";
 import { SettingsView } from "@/components/settings-view";
+import { BottomSheet } from "@/components/bottom-sheet";
+import { ItemDetailSheet } from "@/components/item-detail-sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   markPurchased,
   deleteItem,
-  updatePriority,
 } from "@/lib/actions";
-import { ViewMode, WishlistItem, Tag, Profile, Priority } from "@/types";
+import { ViewMode, WishlistItem, Tag, Profile } from "@/types";
 
 interface WishlistDashboardProps {
   initialItems: WishlistItem[];
@@ -31,21 +34,45 @@ export function WishlistDashboard({
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [items, setItems] = useState<WishlistItem[]>(initialItems);
   const [searchQuery, setSearchQuery] = useState("");
+  const [editingItem, setEditingItem] = useState<WishlistItem | null>(null);
+  const [detailItem, setDetailItem] = useState<WishlistItem | null>(null);
+  const [selectedFilterTags, setSelectedFilterTags] = useState<string[]>([]);
 
   const activeItems = items.filter((item) => !item.is_purchased);
   const purchasedItems = items.filter((item) => item.is_purchased);
 
-  const filteredItems = activeItems.filter(
-    (item) =>
+  const filteredItems = activeItems.filter((item) => {
+    // Search filter
+    const matchesSearch =
+      !searchQuery ||
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.store?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.tags.some((tag) =>
         tag.name.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-  );
+      );
+
+    // Tag filter (OR logic — show items matching any selected tag)
+    const matchesTags =
+      selectedFilterTags.length === 0 ||
+      item.tags.some((tag) => selectedFilterTags.includes(tag.id));
+
+    return matchesSearch && matchesTags;
+  });
+
+  const toggleFilterTag = (tagId: string) => {
+    setSelectedFilterTags((prev) =>
+      prev.includes(tagId)
+        ? prev.filter((id) => id !== tagId)
+        : [...prev, tagId]
+    );
+  };
+
+  const clearFilters = () => {
+    setSearchQuery("");
+    setSelectedFilterTags([]);
+  };
 
   const handleMarkPurchased = async (id: string) => {
-    // Optimistic update
     setItems((prev) =>
       prev.map((item) =>
         item.id === id
@@ -62,7 +89,6 @@ export function WishlistDashboard({
     try {
       await markPurchased(id);
     } catch {
-      // Revert on failure
       setItems((prev) =>
         prev.map((item) =>
           item.id === id
@@ -80,41 +106,28 @@ export function WishlistDashboard({
 
   const handleDelete = async (id: string) => {
     const deletedItem = items.find((item) => item.id === id);
-    // Optimistic update
     setItems((prev) => prev.filter((item) => item.id !== id));
 
     try {
       await deleteItem(id);
     } catch {
-      // Revert on failure
       if (deletedItem) {
         setItems((prev) => [...prev, deletedItem]);
       }
     }
   };
 
-  const handlePriorityChange = async (id: string, priority: Priority) => {
-    const prevPriority = items.find((item) => item.id === id)?.priority;
-    // Optimistic update
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, priority } : item
-      )
-    );
-
-    try {
-      await updatePriority(id, priority);
-    } catch {
-      // Revert on failure
-      if (prevPriority !== undefined) {
-        setItems((prev) =>
-          prev.map((item) =>
-            item.id === id ? { ...item, priority: prevPriority } : item
-          )
-        );
-      }
-    }
+  const handleEdit = (item: WishlistItem) => {
+    setEditingItem(item);
+    setAddModalOpen(true);
   };
+
+  const handleModalClose = () => {
+    setAddModalOpen(false);
+    setEditingItem(null);
+  };
+
+  const hasActiveFilters = searchQuery || selectedFilterTags.length > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -149,6 +162,51 @@ export function WishlistDashboard({
             <ThemeToggle />
           </div>
         </div>
+
+        {/* Tag filter chips */}
+        {activeView === "wishlist" && initialTags.length > 0 && (
+          <div className="px-4 pb-3 -mt-1">
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide max-w-3xl">
+              {initialTags.map((tag) => (
+                <button
+                  key={tag.id}
+                  onClick={() => toggleFilterTag(tag.id)}
+                  className="shrink-0"
+                >
+                  <Badge
+                    variant={
+                      selectedFilterTags.includes(tag.id)
+                        ? "default"
+                        : "outline"
+                    }
+                    className="cursor-pointer transition-all text-xs whitespace-nowrap"
+                    style={
+                      selectedFilterTags.includes(tag.id)
+                        ? { backgroundColor: tag.color, borderColor: tag.color, color: "white" }
+                        : {}
+                    }
+                  >
+                    {tag.name}
+                  </Badge>
+                </button>
+              ))}
+              {selectedFilterTags.length > 0 && (
+                <button
+                  onClick={() => setSelectedFilterTags([])}
+                  className="shrink-0"
+                >
+                  <Badge
+                    variant="outline"
+                    className="cursor-pointer text-xs whitespace-nowrap text-muted-foreground"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear
+                  </Badge>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Main content */}
@@ -158,18 +216,51 @@ export function WishlistDashboard({
             <div className="flex items-center justify-between max-w-[1800px] mx-auto">
               <h2 className="text-sm font-medium text-muted-foreground">
                 {filteredItems.length} item
-                {filteredItems.length !== 1 ? "s" : ""} on your wishlist
+                {filteredItems.length !== 1 ? "s" : ""}
+                {hasActiveFilters ? " found" : " on your wishlist"}
               </h2>
             </div>
 
             {filteredItems.length === 0 ? (
-              <div className="text-center py-20 text-muted-foreground">
-                <p className="text-sm">
-                  {searchQuery
-                    ? "No items match your search."
-                    : "Your wishlist is empty. Add your first item!"}
-                </p>
-              </div>
+              activeItems.length === 0 && !hasActiveFilters ? (
+                /* Empty wishlist — onboarding */
+                <div className="text-center py-24 max-w-sm mx-auto">
+                  <div className="mx-auto h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                    <Heart className="h-8 w-8 text-muted-foreground/50" />
+                  </div>
+                  <h3 className="text-lg font-semibold mb-1">
+                    Your wishlist is empty
+                  </h3>
+                  <p className="text-sm text-muted-foreground mb-6">
+                    Start by adding items you want to keep track of. Paste a URL
+                    or add details manually.
+                  </p>
+                  <Button onClick={() => setAddModalOpen(true)} className="rounded-full">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add Your First Item
+                  </Button>
+                </div>
+              ) : (
+                /* No results matching filters */
+                <div className="text-center py-20 text-muted-foreground">
+                  <p className="text-sm mb-3">
+                    No items match your{" "}
+                    {searchQuery && selectedFilterTags.length > 0
+                      ? "search and filters"
+                      : searchQuery
+                        ? "search"
+                        : "filters"}
+                    .
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearFilters}
+                  >
+                    Clear filters
+                  </Button>
+                </div>
+              )
             ) : (
               <div className="max-w-[1800px] mx-auto columns-2 sm:columns-3 md:columns-4 lg:columns-5 xl:columns-6 gap-4">
                 {filteredItems.map((item) => (
@@ -178,7 +269,8 @@ export function WishlistDashboard({
                     item={item}
                     onMarkPurchased={handleMarkPurchased}
                     onDelete={handleDelete}
-                    onPriorityChange={handlePriorityChange}
+                    onEdit={handleEdit}
+                    onTap={setDetailItem}
                   />
                 ))}
               </div>
@@ -202,12 +294,29 @@ export function WishlistDashboard({
         onAddItem={() => setAddModalOpen(true)}
       />
 
-      {/* Add item modal */}
+      {/* Add/edit item modal */}
       <AddItemModal
         open={addModalOpen}
-        onClose={() => setAddModalOpen(false)}
+        onClose={handleModalClose}
         availableTags={initialTags}
+        editItem={editingItem}
       />
+
+      {/* Bottom sheet for mobile detail view */}
+      <BottomSheet
+        open={!!detailItem}
+        onClose={() => setDetailItem(null)}
+      >
+        {detailItem && (
+          <ItemDetailSheet
+            item={detailItem}
+            onEdit={handleEdit}
+            onMarkPurchased={handleMarkPurchased}
+            onDelete={handleDelete}
+            onClose={() => setDetailItem(null)}
+          />
+        )}
+      </BottomSheet>
     </div>
   );
 }

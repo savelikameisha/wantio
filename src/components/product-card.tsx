@@ -9,15 +9,18 @@ import {
   TrendingDown,
   TrendingUp,
   MoreHorizontal,
+  Pencil,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { WishlistItem, Priority } from "@/types";
+import { cn, getCurrencySymbol } from "@/lib/utils";
+import { WishlistItem } from "@/types";
+import { ImageWithFallback } from "./image-with-fallback";
 
 interface ProductCardProps {
   item: WishlistItem;
   onMarkPurchased?: (id: string) => void;
   onDelete?: (id: string) => void;
-  onPriorityChange?: (id: string, priority: Priority) => void;
+  onEdit?: (item: WishlistItem) => void;
+  onTap?: (item: WishlistItem) => void;
 }
 
 interface MenuPosition {
@@ -29,12 +32,16 @@ export function ProductCard({
   item,
   onMarkPurchased,
   onDelete,
+  onEdit,
+  onTap,
 }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<MenuPosition>({ top: 0, left: 0 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const currSymbol = getCurrencySymbol(item.currency);
 
   const priceChange =
     item.original_price && item.current_price
@@ -48,24 +55,18 @@ export function ProductCard({
   const updateMenuPosition = useCallback(() => {
     if (!buttonRef.current) return;
     const rect = buttonRef.current.getBoundingClientRect();
-    const menuWidth = 176; // w-44 = 11rem = 176px
-    const menuHeight = item.url ? 132 : 88; // approx height based on items
+    const menuWidth = 176;
+    const menuHeight = item.url ? 176 : 132;
 
-    // Position above the button, aligned to the right edge
     let top = rect.top - menuHeight - 6 + window.scrollY;
     let left = rect.right - menuWidth + window.scrollX;
 
-    // If menu would go above viewport, show below the button instead
     if (rect.top - menuHeight - 6 < 0) {
       top = rect.bottom + 6 + window.scrollY;
     }
-
-    // If menu would go off the left edge, align to left edge of button
     if (left < 8) {
       left = rect.left + window.scrollX;
     }
-
-    // If menu would go off the right edge
     if (left + menuWidth > window.innerWidth - 8) {
       left = window.innerWidth - menuWidth - 8 + window.scrollX;
     }
@@ -73,7 +74,6 @@ export function ProductCard({
     setMenuPos({ top, left });
   }, [item.url]);
 
-  // Close menu when clicking outside
   useEffect(() => {
     if (!menuOpen) return;
     const handleClick = (e: MouseEvent) => {
@@ -103,6 +103,15 @@ export function ProductCard({
     setMenuOpen(!menuOpen);
   };
 
+  const handleCardClick = () => {
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia("(hover: none)").matches
+    ) {
+      onTap?.(item);
+    }
+  };
+
   return (
     <div
       className="group relative break-inside-avoid mb-4"
@@ -111,23 +120,17 @@ export function ProductCard({
         setIsHovered(false);
         setMenuOpen(false);
       }}
+      onClick={handleCardClick}
     >
-      {/* Image container — natural aspect ratio */}
       <div className="relative overflow-hidden rounded-2xl bg-muted">
-        {item.image_url ? (
-          <img
-            src={item.image_url}
-            alt={item.name}
-            className="w-full block transition-transform duration-500 group-hover:scale-[1.02]"
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex aspect-square w-full items-center justify-center text-muted-foreground text-sm">
-            No image
-          </div>
-        )}
+        <ImageWithFallback
+          src={item.image_url}
+          alt={item.name}
+          className="w-full block transition-transform duration-500 group-hover:scale-[1.02]"
+          fallbackClassName="aspect-square w-full"
+        />
 
-        {/* Always-visible: price change pill */}
+        {/* Price change pill */}
         {priceChange !== 0 && !isHovered && (
           <div
             className={cn(
@@ -154,7 +157,6 @@ export function ProductCard({
             isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
           )}
         >
-          {/* Top: name + price */}
           <div className="absolute top-0 left-0 right-0 p-3">
             <h3 className="font-semibold text-white text-sm leading-tight truncate drop-shadow-sm">
               {item.name}
@@ -162,20 +164,21 @@ export function ProductCard({
             <div className="flex items-baseline gap-1.5 mt-0.5">
               {item.current_price != null && (
                 <span className="font-bold text-white text-base drop-shadow-sm">
-                  ${item.current_price.toFixed(2)}
+                  {currSymbol}
+                  {item.current_price.toFixed(2)}
                 </span>
               )}
               {item.original_price != null &&
                 item.current_price != null &&
                 item.original_price !== item.current_price && (
                   <span className="text-[11px] text-white/50 line-through">
-                    ${item.original_price.toFixed(2)}
+                    {currSymbol}
+                    {item.original_price.toFixed(2)}
                   </span>
                 )}
             </div>
           </div>
 
-          {/* Bottom: action menu button */}
           <div className="absolute bottom-3 right-3">
             <button
               ref={buttonRef}
@@ -188,14 +191,29 @@ export function ProductCard({
         </div>
       </div>
 
-      {/* Portal dropdown menu — rendered at body level */}
+      {/* Portal dropdown */}
       {menuOpen &&
         createPortal(
           <div
             ref={menuRef}
             className="fixed w-44 bg-white dark:bg-neutral-900 rounded-xl shadow-xl border border-black/10 dark:border-white/10 overflow-hidden z-[9999] animate-in fade-in zoom-in-95 duration-100"
-            style={{ top: menuPos.top, left: menuPos.left, position: "absolute" }}
+            style={{
+              top: menuPos.top,
+              left: menuPos.left,
+              position: "absolute",
+            }}
           >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit?.(item);
+                setMenuOpen(false);
+              }}
+              className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-sm text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            >
+              <Pencil className="h-4 w-4 text-neutral-500" />
+              Edit
+            </button>
             <button
               onClick={(e) => {
                 e.stopPropagation();

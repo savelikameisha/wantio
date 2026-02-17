@@ -3,6 +3,8 @@
 import { DollarSign, Package, TrendingDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ImageWithFallback } from "@/components/image-with-fallback";
+import { getCurrencySymbol } from "@/lib/utils";
 import { WishlistItem } from "@/types";
 
 interface PurchasedViewProps {
@@ -72,63 +74,63 @@ export function PurchasedView({ items }: PurchasedViewProps) {
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {items.map((item) => (
-            <Card
-              key={item.id}
-              className="overflow-hidden border-border/50 opacity-90"
-            >
-              <div className="relative aspect-square overflow-hidden bg-muted">
-                {item.image_url ? (
-                  <img
+          {items.map((item) => {
+            const currSymbol = getCurrencySymbol(item.currency);
+            return (
+              <Card
+                key={item.id}
+                className="overflow-hidden border-border/50 opacity-90"
+              >
+                <div className="relative aspect-square overflow-hidden bg-muted">
+                  <ImageWithFallback
                     src={item.image_url}
                     alt={item.name}
                     className="h-full w-full object-cover grayscale-[30%]"
+                    fallbackClassName="aspect-square w-full"
                   />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-muted-foreground text-sm">
-                    No image
+                  <div className="absolute top-2 right-2">
+                    <Badge className="bg-green-600 text-white text-[10px]">
+                      Purchased
+                    </Badge>
                   </div>
-                )}
-                <div className="absolute top-2 right-2">
-                  <Badge className="bg-green-600 text-white text-[10px]">
-                    Purchased
-                  </Badge>
                 </div>
-              </div>
-              <div className="p-3 space-y-1.5">
-                <h3 className="font-medium text-sm leading-tight line-clamp-2">
-                  {item.name}
-                </h3>
-                <div className="flex items-baseline gap-1.5">
-                  <span className="font-semibold text-sm">
-                    $
-                    {(
-                      item.purchased_price ??
-                      item.current_price ??
-                      0
-                    ).toFixed(2)}
-                  </span>
-                  {item.original_price != null &&
-                    item.purchased_price != null &&
-                    item.original_price > item.purchased_price && (
-                      <span className="text-xs text-green-600 dark:text-green-400">
-                        saved $
-                        {(item.original_price - item.purchased_price).toFixed(2)}
-                      </span>
-                    )}
+                <div className="p-3 space-y-1.5">
+                  <h3 className="font-medium text-sm leading-tight line-clamp-2">
+                    {item.name}
+                  </h3>
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="font-semibold text-sm">
+                      {currSymbol}
+                      {(
+                        item.purchased_price ??
+                        item.current_price ??
+                        0
+                      ).toFixed(2)}
+                    </span>
+                    {item.original_price != null &&
+                      item.purchased_price != null &&
+                      item.original_price > item.purchased_price && (
+                        <span className="text-xs text-green-600 dark:text-green-400">
+                          saved {currSymbol}
+                          {(item.original_price - item.purchased_price).toFixed(
+                            2
+                          )}
+                        </span>
+                      )}
+                  </div>
+                  {item.purchased_at && (
+                    <p className="text-[11px] text-muted-foreground">
+                      {new Date(item.purchased_at).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </p>
+                  )}
                 </div>
-                {item.purchased_at && (
-                  <p className="text-[11px] text-muted-foreground">
-                    {new Date(item.purchased_at).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    })}
-                  </p>
-                )}
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

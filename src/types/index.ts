@@ -1,5 +1,3 @@
-export type Priority = 0 | 1 | 2 | 3;
-
 export interface Tag {
   id: string;
   name: string;
@@ -19,7 +17,7 @@ export interface WishlistItem {
   current_price?: number;
   original_price?: number;
   store?: string;
-  priority: Priority;
+  currency?: string;
   is_purchased: boolean;
   purchased_at?: string;
   purchased_price?: number;

@@ -6,7 +6,43 @@ interface ScrapedData {
   price: number | null;
   image_url: string | null;
   store: string | null;
+  currency: string | null;
   url: string;
+}
+
+// Domain-based currency detection
+const DOMAIN_CURRENCIES: Record<string, string> = {
+  ".co.uk": "GBP", ".de": "EUR", ".fr": "EUR", ".it": "EUR",
+  ".es": "EUR", ".nl": "EUR", ".be": "EUR", ".at": "EUR",
+  ".ca": "CAD", ".co.jp": "JPY", ".jp": "JPY",
+  ".com.au": "AUD", ".co.kr": "KRW", ".co.in": "INR",
+  ".com.br": "BRL", ".com.mx": "MXN", ".se": "SEK",
+  ".no": "NOK", ".dk": "DKK", ".pl": "PLN", ".ch": "CHF",
+};
+
+function detectCurrencyFromDomain(url: string): string | null {
+  try {
+    const hostname = new URL(url).hostname;
+    for (const [suffix, currency] of Object.entries(DOMAIN_CURRENCIES)) {
+      if (hostname.endsWith(suffix)) return currency;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function detectCurrencyFromPrice(priceStr: string | undefined | null): string | null {
+  if (!priceStr) return null;
+  const s = priceStr.trim();
+  if (s.startsWith("€") || s.includes("EUR")) return "EUR";
+  if (s.startsWith("£") || s.includes("GBP")) return "GBP";
+  if (s.startsWith("¥") || s.includes("JPY")) return "JPY";
+  if (s.includes("CA$") || s.includes("CAD")) return "CAD";
+  if (s.includes("A$") || s.includes("AUD")) return "AUD";
+  if (s.startsWith("₹") || s.includes("INR")) return "INR";
+  if (s.startsWith("R$") || s.includes("BRL")) return "BRL";
+  if (s.startsWith("₩") || s.includes("KRW")) return "KRW";
+  if (s.startsWith("$") || s.includes("USD")) return "USD";
+  return null;
 }
 
 // Common store name mappings from hostname
@@ -90,8 +126,9 @@ function extractJsonLd($: cheerio.CheerioAPI): {
   name?: string;
   price?: number | null;
   image?: string;
+  currency?: string;
 } {
-  const result: { name?: string; price?: number | null; image?: string } = {};
+  const result: { name?: string; price?: number | null; image?: string; currency?: string } = {};
 
   $('script[type="application/ld+json"]').each((_, el) => {
     try {
@@ -132,6 +169,9 @@ function extractJsonLd($: cheerio.CheerioAPI): {
               offer.price ?? offer.lowPrice ?? offer.highPrice;
             if (price) {
               result.price = parsePrice(String(price));
+            }
+            if (offer.priceCurrency && !result.currency) {
+              result.currency = offer.priceCurrency;
             }
           }
         }
@@ -206,6 +246,9 @@ export async function POST(request: Request) {
       $('meta[property="og:price:amount"]').attr("content") ||
       $('meta[property="product:price:amount"]').attr("content") ||
       $('meta[property="product:price"]').attr("content");
+    const ogCurrency =
+      $('meta[property="og:price:currency"]').attr("content") ||
+      $('meta[property="product:price:currency"]').attr("content");
 
     // 3. Extract from Twitter card
     const twitterTitle = $('meta[name="twitter:title"]').attr("content");
@@ -250,6 +293,15 @@ export async function POST(request: Request) {
       }
     };
 
+    // Detect currency: JSON-LD > OG > price string > domain TLD
+    const rawPriceStr = $('[data-price]').first().text() || $('.price').first().text() || ogPrice || "";
+    const detectedCurrency =
+      jsonLd.currency ||
+      ogCurrency ||
+      detectCurrencyFromPrice(rawPriceStr) ||
+      detectCurrencyFromDomain(url) ||
+      null;
+
     // Assemble result with priority: JSON-LD > OG > Twitter > Selectors > Page
     const result: ScrapedData = {
       name:
@@ -269,6 +321,7 @@ export async function POST(request: Request) {
         resolveUrl(twitterImage) ||
         null,
       store: getStoreName(url),
+      currency: detectedCurrency,
       url,
     };
 

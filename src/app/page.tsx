@@ -1,7 +1,18 @@
+import { createClient } from "@/lib/supabase/server";
 import { getWishlistItems, getTags, getProfile } from "@/lib/data";
 import { WishlistDashboard } from "@/components/wishlist-dashboard";
+import { LandingPage } from "@/components/landing-page";
 
 export default async function Home() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return <LandingPage />;
+  }
+
   const [items, tags, profile] = await Promise.all([
     getWishlistItems(),
     getTags(),

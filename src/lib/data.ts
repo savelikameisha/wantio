@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { WishlistItem, Tag, Profile, Priority } from "@/types";
+import { WishlistItem, Tag, Profile } from "@/types";
 
 export async function getWishlistItems(): Promise<WishlistItem[]> {
   const supabase = createClient();
@@ -29,7 +29,7 @@ export async function getWishlistItems(): Promise<WishlistItem[]> {
       ? Number(item.original_price)
       : undefined,
     store: item.store,
-    priority: item.priority as Priority,
+    currency: item.currency || "USD",
     is_purchased: item.is_purchased,
     purchased_at: item.purchased_at,
     purchased_price: item.purchased_price

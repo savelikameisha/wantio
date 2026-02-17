@@ -2,14 +2,13 @@
 
 import { useState } from "react";
 import {
-  Clock,
   Globe,
-  Bell,
-  DollarSign,
   Tags,
   Copy,
   Check,
   LogOut,
+  X,
+  Plus,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -17,31 +16,30 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Tag, Profile } from "@/types";
-import { updateProfile } from "@/lib/actions";
-import { ThemeToggle } from "./theme-toggle";
+import { updateProfile, createTag, deleteTag } from "@/lib/actions";
 
 interface SettingsViewProps {
   tags: Tag[];
   profile: Profile | null;
 }
 
+const PRESET_COLORS = [
+  "#6366f1", "#ef4444", "#f59e0b", "#10b981",
+  "#3b82f6", "#8b5cf6", "#ec4899", "#64748b",
+  "#14b8a6", "#f97316",
+];
+
 export function SettingsView({ tags, profile }: SettingsViewProps) {
-  const [frequency, setFrequency] = useState(
-    profile?.price_check_frequency ?? "daily"
-  );
   const [shareEnabled, setShareEnabled] = useState(
     profile?.public_share_enabled ?? false
   );
-  const [emailNotifs, setEmailNotifs] = useState(
-    profile?.notification_email ?? true
-  );
-  const [pushNotifs, setPushNotifs] = useState(
-    profile?.notification_push ?? false
-  );
-  const [currency, setCurrency] = useState(profile?.currency ?? "USD");
   const [copied, setCopied] = useState(false);
+  const [localTags, setLocalTags] = useState<Tag[]>(tags);
+  const [showTagForm, setShowTagForm] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const [newTagColor, setNewTagColor] = useState(PRESET_COLORS[0]);
+  const [tagLoading, setTagLoading] = useState(false);
 
   const shareLink = profile?.public_share_id
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/shared/${profile.public_share_id}`
@@ -53,80 +51,49 @@ export function SettingsView({ tags, profile }: SettingsViewProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleUpdate = async (data: Parameters<typeof updateProfile>[0]) => {
+  const handleShareToggle = async (value: boolean) => {
+    setShareEnabled(value);
     try {
-      await updateProfile(data);
+      await updateProfile({ public_share_enabled: value });
     } catch {
-      // TODO: Show error toast
+      setShareEnabled(!value);
     }
   };
 
-  const handleFrequency = (value: string) => {
-    setFrequency(value);
-    handleUpdate({ price_check_frequency: value });
+  const handleCreateTag = async () => {
+    if (!newTagName.trim() || tagLoading) return;
+    setTagLoading(true);
+    const optimisticTag: Tag = {
+      id: crypto.randomUUID(),
+      name: newTagName.trim(),
+      color: newTagColor,
+    };
+    setLocalTags((prev) => [...prev, optimisticTag]);
+    setNewTagName("");
+    setShowTagForm(false);
+
+    try {
+      await createTag(optimisticTag.name, optimisticTag.color);
+    } catch {
+      setLocalTags((prev) => prev.filter((t) => t.id !== optimisticTag.id));
+    } finally {
+      setTagLoading(false);
+    }
   };
 
-  const handleShareToggle = (value: boolean) => {
-    setShareEnabled(value);
-    handleUpdate({ public_share_enabled: value });
+  const handleDeleteTag = async (tagId: string) => {
+    const deleted = localTags.find((t) => t.id === tagId);
+    setLocalTags((prev) => prev.filter((t) => t.id !== tagId));
+
+    try {
+      await deleteTag(tagId);
+    } catch {
+      if (deleted) setLocalTags((prev) => [...prev, deleted]);
+    }
   };
-
-  const handleEmailNotifs = (value: boolean) => {
-    setEmailNotifs(value);
-    handleUpdate({ notification_email: value });
-  };
-
-  const handlePushNotifs = (value: boolean) => {
-    setPushNotifs(value);
-    handleUpdate({ notification_push: value });
-  };
-
-  const handleCurrency = (value: string) => {
-    setCurrency(value);
-    handleUpdate({ currency: value });
-  };
-
-  const frequencies = [
-    { value: "hourly", label: "Hourly" },
-    { value: "daily", label: "Daily" },
-    { value: "weekly", label: "Weekly" },
-  ];
-
-  const currencies = ["USD", "EUR", "GBP", "CAD", "AUD", "JPY"];
 
   return (
     <div className="max-w-lg mx-auto space-y-4">
-      {/* Appearance */}
-      <Card className="p-4 border-border/50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="text-sm font-medium">Appearance</div>
-          </div>
-          <ThemeToggle />
-        </div>
-      </Card>
-
-      {/* Price Check Frequency */}
-      <Card className="p-4 border-border/50 space-y-3">
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          <Label className="text-sm font-medium">Price Check Frequency</Label>
-        </div>
-        <div className="flex gap-1.5">
-          {frequencies.map((f) => (
-            <Button
-              key={f.value}
-              variant={frequency === f.value ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleFrequency(f.value)}
-              className="flex-1 text-xs"
-            >
-              {f.label}
-            </Button>
-          ))}
-        </div>
-      </Card>
-
       {/* Public Share Link */}
       <Card className="p-4 border-border/50 space-y-3">
         <div className="flex items-center justify-between">
@@ -162,50 +129,6 @@ export function SettingsView({ tags, profile }: SettingsViewProps) {
         </p>
       </Card>
 
-      {/* Notifications */}
-      <Card className="p-4 border-border/50 space-y-3">
-        <div className="flex items-center gap-2">
-          <Bell className="h-4 w-4 text-muted-foreground" />
-          <Label className="text-sm font-medium">Notifications</Label>
-        </div>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm text-muted-foreground">
-              Email notifications
-            </Label>
-            <Switch checked={emailNotifs} onCheckedChange={handleEmailNotifs} />
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <Label className="text-sm text-muted-foreground">
-              Push notifications
-            </Label>
-            <Switch checked={pushNotifs} onCheckedChange={handlePushNotifs} />
-          </div>
-        </div>
-      </Card>
-
-      {/* Currency */}
-      <Card className="p-4 border-border/50 space-y-3">
-        <div className="flex items-center gap-2">
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
-          <Label className="text-sm font-medium">Currency</Label>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {currencies.map((c) => (
-            <Button
-              key={c}
-              variant={currency === c ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleCurrency(c)}
-              className="text-xs"
-            >
-              {c}
-            </Button>
-          ))}
-        </div>
-      </Card>
-
       {/* Tag Management */}
       <Card className="p-4 border-border/50 space-y-3">
         <div className="flex items-center justify-between">
@@ -213,25 +136,84 @@ export function SettingsView({ tags, profile }: SettingsViewProps) {
             <Tags className="h-4 w-4 text-muted-foreground" />
             <Label className="text-sm font-medium">Tags</Label>
           </div>
-          <Button variant="outline" size="sm" className="text-xs">
-            Add Tag
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            onClick={() => setShowTagForm(!showTagForm)}
+          >
+            {showTagForm ? (
+              <><X className="h-3 w-3 mr-1" /> Cancel</>
+            ) : (
+              <><Plus className="h-3 w-3 mr-1" /> Add Tag</>
+            )}
           </Button>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {tags.map((tag) => (
-            <Badge
-              key={tag.id}
-              variant="secondary"
-              className="text-xs cursor-default"
-              style={{
-                backgroundColor: `${tag.color}15`,
-                color: tag.color,
-                borderColor: `${tag.color}30`,
-              }}
+
+        {/* Tag creation form */}
+        {showTagForm && (
+          <div className="space-y-3 p-3 bg-muted/50 rounded-lg">
+            <Input
+              placeholder="Tag name"
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value.slice(0, 20))}
+              className="h-9 text-sm"
+              onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
+            />
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Color:</span>
+              <div className="flex gap-1.5 flex-wrap">
+                {PRESET_COLORS.map((color) => (
+                  <button
+                    key={color}
+                    onClick={() => setNewTagColor(color)}
+                    className="h-6 w-6 rounded-full transition-all flex items-center justify-center"
+                    style={{ backgroundColor: color }}
+                  >
+                    {newTagColor === color && (
+                      <Check className="h-3 w-3 text-white" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <Button
+              size="sm"
+              className="w-full text-xs"
+              onClick={handleCreateTag}
+              disabled={!newTagName.trim() || tagLoading}
             >
-              {tag.name}
-            </Badge>
-          ))}
+              Create Tag
+            </Button>
+          </div>
+        )}
+
+        {/* Existing tags */}
+        <div className="flex flex-wrap gap-1.5">
+          {localTags.length === 0 ? (
+            <p className="text-xs text-muted-foreground">No tags yet.</p>
+          ) : (
+            localTags.map((tag) => (
+              <Badge
+                key={tag.id}
+                variant="secondary"
+                className="text-xs cursor-default group/tag pr-1"
+                style={{
+                  backgroundColor: `${tag.color}15`,
+                  color: tag.color,
+                  borderColor: `${tag.color}30`,
+                }}
+              >
+                {tag.name}
+                <button
+                  onClick={() => handleDeleteTag(tag.id)}
+                  className="ml-1 opacity-0 group-hover/tag:opacity-100 transition-opacity hover:text-red-500"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))
+          )}
         </div>
       </Card>
 

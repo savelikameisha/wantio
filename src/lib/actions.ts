@@ -10,6 +10,7 @@ export async function addItem(formData: {
   current_price?: number;
   store?: string;
   notes?: string;
+  currency?: string;
   tagIds: string[];
 }) {
   const supabase = createClient();
@@ -29,6 +30,7 @@ export async function addItem(formData: {
       original_price: formData.current_price ?? null,
       store: formData.store || null,
       notes: formData.notes || null,
+      currency: formData.currency || "USD",
     })
     .select()
     .single();
@@ -93,14 +95,49 @@ export async function deleteItem(itemId: string) {
   revalidatePath("/");
 }
 
-export async function updatePriority(itemId: string, priority: number) {
+export async function updateItem(
+  itemId: string,
+  formData: {
+    name: string;
+    url?: string;
+    image_url?: string;
+    current_price?: number;
+    store?: string;
+    notes?: string;
+    currency?: string;
+    tagIds: string[];
+  }
+) {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
   const { error } = await supabase
     .from("wishlist_items")
-    .update({ priority })
-    .eq("id", itemId);
+    .update({
+      name: formData.name,
+      url: formData.url || null,
+      image_url: formData.image_url || null,
+      current_price: formData.current_price ?? null,
+      store: formData.store || null,
+      notes: formData.notes || null,
+      currency: formData.currency || "USD",
+    })
+    .eq("id", itemId)
+    .eq("user_id", user.id);
 
   if (error) throw error;
+
+  // Replace tag associations
+  await supabase.from("item_tags").delete().eq("item_id", itemId);
+  if (formData.tagIds.length > 0) {
+    await supabase.from("item_tags").insert(
+      formData.tagIds.map((tagId) => ({ item_id: itemId, tag_id: tagId }))
+    );
+  }
+
   revalidatePath("/");
 }
 
