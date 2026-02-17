@@ -118,32 +118,44 @@ export function WishlistDashboard({
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* Pinterest-style search header */}
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h1 className="text-lg font-semibold tracking-tight">Wantry</h1>
-          <div className="flex items-center gap-2">
-            {activeView === "wishlist" && (
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Search items..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 h-9 w-48 md:w-64 text-sm bg-muted/50 border-transparent focus:border-border"
-                />
-              </div>
-            )}
+        <div className="w-full px-4 py-3 flex items-center gap-4">
+          {/* Logo */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-sm">W</span>
+            </div>
+            <span className="text-base font-semibold tracking-tight hidden sm:block">
+              Wantry
+            </span>
+          </div>
+
+          {/* Full-width search bar */}
+          {activeView === "wishlist" && (
+            <div className="relative flex-1 max-w-3xl">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search your wishlist..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-11 h-11 w-full text-sm bg-muted/50 border-transparent rounded-full focus:border-border focus:bg-background"
+              />
+            </div>
+          )}
+
+          {/* Right side */}
+          <div className="flex items-center gap-2 shrink-0 ml-auto">
             <ThemeToggle />
           </div>
         </div>
       </header>
 
       {/* Main content */}
-      <main className="max-w-6xl mx-auto px-4 py-6 pb-28">
+      <main className="w-full px-4 py-6 pb-28">
         {activeView === "wishlist" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between max-w-[1800px] mx-auto">
               <h2 className="text-sm font-medium text-muted-foreground">
                 {filteredItems.length} item
                 {filteredItems.length !== 1 ? "s" : ""} on your wishlist
@@ -159,7 +171,7 @@ export function WishlistDashboard({
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="max-w-[1800px] mx-auto columns-2 sm:columns-3 md:columns-4 lg:columns-5 xl:columns-6 gap-4">
                 {filteredItems.map((item) => (
                   <ProductCard
                     key={item.id}
