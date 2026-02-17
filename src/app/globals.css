@@ -66,4 +66,10 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+  .logo-spin {
+    transition: transform 0.6s ease;
+  }
+  .logo-spin:hover {
+    transform: rotate(360deg);
+  }
 }

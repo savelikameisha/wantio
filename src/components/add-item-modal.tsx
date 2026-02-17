@@ -259,20 +259,38 @@ export function AddItemModal({
                   </p>
                 )}
                 {scrapeStatus === "loading" && (
-                  <p className="text-xs text-muted-foreground">
-                    Extracting and analyzing product details...
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <div className="h-3 w-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                    <p className="text-sm text-muted-foreground">
+                      AI is analyzing product page...
+                    </p>
+                  </div>
                 )}
                 {scrapeStatus === "success" && !isEditing && (
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-xs text-green-600 dark:text-green-400">
-                      Product details extracted!
-                    </p>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      {aiEnhanced ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
+                          <Sparkles className="h-3.5 w-3.5" />
+                          AI extracted successfully
+                        </span>
+                      ) : (
+                        <p className="text-xs text-green-600 dark:text-green-400">
+                          Product details extracted
+                        </p>
+                      )}
+                    </div>
                     {aiEnhanced && (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
-                        <Sparkles className="h-3 w-3" />
-                        AI Enhanced
-                      </span>
+                      <p className="text-[11px] text-muted-foreground">
+                        Filled: {[
+                          name && "name",
+                          price && "price",
+                          imageUrl && "image",
+                          store && "store",
+                          notes && "notes",
+                          selectedTags.length > 0 && `${selectedTags.length} tag${selectedTags.length > 1 ? "s" : ""} suggested`,
+                        ].filter(Boolean).join(", ")}
+                      </p>
                     )}
                   </div>
                 )}

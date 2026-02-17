@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { Search, Heart, Plus, X } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Search, Heart, Plus, X, ChevronDown, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { FloatingNav } from "@/components/floating-nav";
 import { ProductCard } from "@/components/product-card";
 import { AddItemModal } from "@/components/add-item-modal";
@@ -12,7 +11,6 @@ import { PurchasedView } from "@/components/purchased-view";
 import { SettingsView } from "@/components/settings-view";
 import { BottomSheet } from "@/components/bottom-sheet";
 import { ItemDetailSheet } from "@/components/item-detail-sheet";
-import { ThemeToggle } from "@/components/theme-toggle";
 import {
   markPurchased,
   deleteItem,
@@ -128,97 +126,137 @@ export function WishlistDashboard({
   };
 
   const hasActiveFilters = searchQuery || selectedFilterTags.length > 0;
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+  const tagDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close tag dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(e.target as Node)) {
+        setTagDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Tag pill label
+  const tagPillLabel = selectedFilterTags.length === 0
+    ? `All (${activeItems.length})`
+    : selectedFilterTags.length <= 2
+      ? selectedFilterTags
+          .map((id) => initialTags.find((t) => t.id === id)?.name)
+          .filter(Boolean)
+          .join(", ")
+      : `${selectedFilterTags.length} tags`;
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Pinterest-style search header */}
-      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl border-b border-border/50">
-        <div className="w-full px-4 py-3 flex items-center gap-4">
-          {/* Logo */}
-          <div className="flex items-center gap-2 shrink-0">
-            <img src="/icon.svg" alt="Wantry" className="h-8 w-8" />
-            <span className="text-base font-semibold tracking-tight hidden sm:block">
-              Wantry
-            </span>
-          </div>
+      {/* Clean single-row header */}
+      <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl">
+        <div className="w-full px-4 py-3 flex items-center gap-3">
+          {/* Logo — icon only, spin on hover */}
+          <img src="/icon.svg" alt="Wantry" className="h-9 w-9 shrink-0 cursor-pointer logo-spin" />
+
+          {/* Tags dropdown pill */}
+          {activeView === "wishlist" && initialTags.length > 0 && (
+            <div className="relative shrink-0" ref={tagDropdownRef}>
+              <button
+                onClick={() => setTagDropdownOpen(!tagDropdownOpen)}
+                onMouseEnter={() => setTagDropdownOpen(true)}
+                className={`h-11 px-4 flex items-center gap-2 text-sm font-medium rounded-full border transition-colors ${
+                  selectedFilterTags.length > 0
+                    ? "border-primary/50 text-primary bg-primary/5"
+                    : "border-border text-foreground hover:border-foreground/30"
+                }`}
+              >
+                {tagPillLabel}
+                <ChevronDown className={`h-3.5 w-3.5 transition-transform ${tagDropdownOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {/* Dropdown */}
+              {tagDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1.5 w-52 bg-card border border-border rounded-xl shadow-lg py-1.5 z-50">
+                  {/* All option */}
+                  <button
+                    onClick={() => { setSelectedFilterTags([]); setTagDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
+                  >
+                    <div className={`h-4 w-4 rounded border flex items-center justify-center ${
+                      selectedFilterTags.length === 0 ? "bg-primary border-primary" : "border-border"
+                    }`}>
+                      {selectedFilterTags.length === 0 && <Check className="h-3 w-3 text-white" />}
+                    </div>
+                    <span className="font-medium">All</span>
+                    <span className="text-muted-foreground ml-auto text-xs">({activeItems.length})</span>
+                  </button>
+
+                  <div className="h-px bg-border mx-2 my-1" />
+
+                  {/* Tag options */}
+                  {initialTags.map((tag) => {
+                    const isSelected = selectedFilterTags.includes(tag.id);
+                    const count = activeItems.filter((item) =>
+                      item.tags.some((t) => t.id === tag.id)
+                    ).length;
+                    return (
+                      <button
+                        key={tag.id}
+                        onClick={() => toggleFilterTag(tag.id)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-muted/50 transition-colors"
+                      >
+                        <div className={`h-4 w-4 rounded border flex items-center justify-center ${
+                          isSelected ? "border-transparent" : "border-border"
+                        }`} style={isSelected ? { backgroundColor: tag.color } : {}}>
+                          {isSelected && <Check className="h-3 w-3 text-white" />}
+                        </div>
+                        <div
+                          className="h-2.5 w-2.5 rounded-full shrink-0"
+                          style={{ backgroundColor: tag.color }}
+                        />
+                        <span>{tag.name}</span>
+                        <span className="text-muted-foreground ml-auto text-xs">({count})</span>
+                      </button>
+                    );
+                  })}
+
+                  {/* Clear selection */}
+                  {selectedFilterTags.length > 0 && (
+                    <>
+                      <div className="h-px bg-border mx-2 my-1" />
+                      <button
+                        onClick={() => { setSelectedFilterTags([]); setTagDropdownOpen(false); }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Clear filters
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Full-width search bar */}
           {activeView === "wishlist" && (
-            <div className="relative flex-1 max-w-3xl">
+            <div className="relative flex-1">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search your wishlist..."
+                placeholder="Search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-11 h-11 w-full text-sm bg-muted/50 border-transparent rounded-full focus:border-border focus:bg-background"
               />
             </div>
           )}
-
-          {/* Right side */}
-          <div className="flex items-center gap-2 shrink-0 ml-auto">
-            <ThemeToggle />
-          </div>
         </div>
-
-        {/* Tag filter chips */}
-        {activeView === "wishlist" && initialTags.length > 0 && (
-          <div className="px-4 pb-3 -mt-1">
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide max-w-3xl">
-              {initialTags.map((tag) => (
-                <button
-                  key={tag.id}
-                  onClick={() => toggleFilterTag(tag.id)}
-                  className="shrink-0"
-                >
-                  <Badge
-                    variant={
-                      selectedFilterTags.includes(tag.id)
-                        ? "default"
-                        : "outline"
-                    }
-                    className="cursor-pointer transition-all text-xs whitespace-nowrap"
-                    style={
-                      selectedFilterTags.includes(tag.id)
-                        ? { backgroundColor: tag.color, borderColor: tag.color, color: "white" }
-                        : {}
-                    }
-                  >
-                    {tag.name}
-                  </Badge>
-                </button>
-              ))}
-              {selectedFilterTags.length > 0 && (
-                <button
-                  onClick={() => setSelectedFilterTags([])}
-                  className="shrink-0"
-                >
-                  <Badge
-                    variant="outline"
-                    className="cursor-pointer text-xs whitespace-nowrap text-muted-foreground"
-                  >
-                    <X className="h-3 w-3 mr-1" />
-                    Clear
-                  </Badge>
-                </button>
-              )}
-            </div>
-          </div>
-        )}
       </header>
 
       {/* Main content */}
       <main className="w-full px-4 py-6 pb-28">
         {activeView === "wishlist" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between max-w-[1800px] mx-auto">
-              <h2 className="text-sm font-medium text-muted-foreground">
-                {filteredItems.length} item
-                {filteredItems.length !== 1 ? "s" : ""}
-                {hasActiveFilters ? " found" : " on your wishlist"}
-              </h2>
-            </div>
-
             {filteredItems.length === 0 ? (
               activeItems.length === 0 && !hasActiveFilters ? (
                 /* Empty wishlist — onboarding */

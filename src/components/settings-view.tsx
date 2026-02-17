@@ -9,7 +9,11 @@ import {
   LogOut,
   X,
   Plus,
+  Sun,
+  Moon,
+  Monitor,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -217,6 +221,9 @@ export function SettingsView({ tags, profile }: SettingsViewProps) {
         </div>
       </Card>
 
+      {/* Appearance */}
+      <AppearanceCard />
+
       {/* Sign Out */}
       <Card className="p-4 border-border/50">
         <form action="/auth/signout" method="post">
@@ -231,5 +238,45 @@ export function SettingsView({ tags, profile }: SettingsViewProps) {
         </form>
       </Card>
     </div>
+  );
+}
+
+function AppearanceCard() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useState(() => {
+    setMounted(true);
+  });
+
+  const options = [
+    { value: "light", label: "Light", icon: Sun },
+    { value: "dark", label: "Dark", icon: Moon },
+    { value: "system", label: "System", icon: Monitor },
+  ] as const;
+
+  return (
+    <Card className="p-4 border-border/50 space-y-3">
+      <div className="flex items-center gap-2">
+        <Sun className="h-4 w-4 text-muted-foreground" />
+        <Label className="text-sm font-medium">Appearance</Label>
+      </div>
+      <div className="flex gap-2">
+        {options.map(({ value, label, icon: Icon }) => (
+          <button
+            key={value}
+            onClick={() => setTheme(value)}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-sm font-medium transition-colors border ${
+              mounted && theme === value
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+            {label}
+          </button>
+        ))}
+      </div>
+    </Card>
   );
 }
