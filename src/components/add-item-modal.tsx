@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { Link2, PenLine, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Link2, PenLine, Loader2, CheckCircle2, AlertCircle, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +45,7 @@ export function AddItemModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [scrapeStatus, setScrapeStatus] = useState<ScrapeStatus>("idle");
   const [scrapeError, setScrapeError] = useState("");
+  const [aiEnhanced, setAiEnhanced] = useState(false);
 
   // Pre-fill when editing
   useEffect(() => {
@@ -75,12 +76,16 @@ export function AddItemModal({
 
     setScrapeStatus("loading");
     setScrapeError("");
+    setAiEnhanced(false);
 
     try {
       const res = await fetch("/api/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: inputUrl }),
+        body: JSON.stringify({
+          url: inputUrl,
+          existingTags: availableTags.map((t) => t.name),
+        }),
       });
 
       const data = await res.json();
@@ -97,12 +102,27 @@ export function AddItemModal({
       if (data.store) setStore(data.store);
       if (data.currency) setCurrency(data.currency);
 
+      // AI-enhanced fields
+      if (data.notes) setNotes(data.notes);
+      if (data.suggested_tags && Array.isArray(data.suggested_tags)) {
+        const suggestedTagIds = data.suggested_tags
+          .map((tagName: string) =>
+            availableTags.find(
+              (t) => t.name.toLowerCase() === tagName.toLowerCase()
+            )
+          )
+          .filter(Boolean)
+          .map((t: { id: string }) => t.id);
+        if (suggestedTagIds.length > 0) setSelectedTags(suggestedTagIds);
+      }
+      if (data.ai_enhanced) setAiEnhanced(true);
+
       setScrapeStatus("success");
     } catch {
       setScrapeStatus("error");
       setScrapeError("Could not connect to scraping service");
     }
-  }, []);
+  }, [availableTags]);
 
   const handleUrlChange = (value: string) => {
     setUrl(value);
@@ -160,6 +180,7 @@ export function AddItemModal({
     setSelectedTags([]);
     setScrapeStatus("idle");
     setScrapeError("");
+    setAiEnhanced(false);
   };
 
   const isEditing = !!editItem;
@@ -239,13 +260,21 @@ export function AddItemModal({
                 )}
                 {scrapeStatus === "loading" && (
                   <p className="text-xs text-muted-foreground">
-                    Extracting product details...
+                    Extracting and analyzing product details...
                   </p>
                 )}
                 {scrapeStatus === "success" && !isEditing && (
-                  <p className="text-xs text-green-600 dark:text-green-400">
-                    Product details extracted! Review and edit below.
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs text-green-600 dark:text-green-400">
+                      Product details extracted!
+                    </p>
+                    {aiEnhanced && (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-primary bg-primary/10 px-1.5 py-0.5 rounded-full">
+                        <Sparkles className="h-3 w-3" />
+                        AI Enhanced
+                      </span>
+                    )}
+                  </div>
                 )}
                 {scrapeStatus === "error" && (
                   <p className="text-xs text-red-500">

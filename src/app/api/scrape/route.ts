@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import * as cheerio from "cheerio";
+import OpenAI from "openai";
 
 interface ScrapedData {
   name: string | null;
@@ -8,6 +9,9 @@ interface ScrapedData {
   store: string | null;
   currency: string | null;
   url: string;
+  suggested_tags: string[];
+  notes: string | null;
+  ai_enhanced: boolean;
 }
 
 // Domain-based currency detection
@@ -87,19 +91,15 @@ function getStoreName(url: string): string | null {
   try {
     const hostname = new URL(url).hostname.replace(/^www\./, "");
 
-    // Check exact match
     if (STORE_NAMES[hostname]) return STORE_NAMES[hostname];
 
-    // Check if hostname ends with a known domain
     for (const [domain, name] of Object.entries(STORE_NAMES)) {
       if (hostname.endsWith(domain)) return name;
     }
 
-    // Fallback: clean up the hostname as a store name
     const parts = hostname.split(".");
     if (parts.length >= 2) {
       const name = parts[parts.length - 2];
-      // Capitalize first letter
       return name.charAt(0).toUpperCase() + name.slice(1);
     }
 
@@ -112,11 +112,10 @@ function getStoreName(url: string): string | null {
 function parsePrice(priceStr: string | undefined | null): number | null {
   if (!priceStr) return null;
 
-  // Remove currency symbols, whitespace, and common separators
   const cleaned = priceStr
     .replace(/[^0-9.,]/g, "")
-    .replace(/,(\d{2})$/, ".$1") // Handle European format: 1.234,56 -> 1234.56
-    .replace(/,/g, ""); // Remove remaining commas
+    .replace(/,(\d{2})$/, ".$1")
+    .replace(/,/g, "");
 
   const num = parseFloat(cleaned);
   return isNaN(num) ? null : Math.round(num * 100) / 100;
@@ -136,12 +135,9 @@ function extractJsonLd($: cheerio.CheerioAPI): {
       if (!text) return;
 
       const data = JSON.parse(text);
-
-      // Handle both single objects and arrays
       const items = Array.isArray(data) ? data : [data];
 
       for (const item of items) {
-        // Look for Product schema
         const product =
           item["@type"] === "Product"
             ? item
@@ -161,7 +157,6 @@ function extractJsonLd($: cheerio.CheerioAPI): {
             result.image = typeof img === "string" ? img : img?.url;
           }
 
-          // Price from offers
           const offers = product.offers;
           if (offers && !result.price) {
             const offer = Array.isArray(offers) ? offers[0] : offers;
@@ -184,9 +179,108 @@ function extractJsonLd($: cheerio.CheerioAPI): {
   return result;
 }
 
+// ── AI Enhancement ──────────────────────────────────────────────────
+
+function truncateHtml(html: string, maxLength: number = 15000): string {
+  const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+
+  const head = headMatch ? headMatch[0] : "";
+  const bodyContent = bodyMatch ? bodyMatch[1] || "" : html;
+  const remainingLength = maxLength - head.length;
+
+  return head + bodyContent.substring(0, Math.max(0, remainingLength));
+}
+
+async function enhanceWithAI(
+  html: string,
+  basicData: {
+    name: string | null;
+    price: number | null;
+    image_url: string | null;
+    store: string | null;
+    currency: string | null;
+  },
+  existingTags: string[]
+): Promise<{
+  name: string | null;
+  price: number | null;
+  image_url: string | null;
+  suggested_tags: string[];
+  notes: string | null;
+} | null> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+
+  try {
+    const openai = new OpenAI({ apiKey });
+    const truncatedHtml = truncateHtml(html);
+
+    const tagContext = existingTags.length > 0
+      ? `\nUser's existing tags: [${existingTags.join(", ")}]\nSelect 0-3 tags from this list that fit the product. Only use exact tag names from this list.`
+      : "\nNo existing tags available. Return an empty suggested_tags array.";
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      max_tokens: 300,
+      messages: [
+        {
+          role: "system",
+          content: "You are a product data extraction assistant. Return only valid JSON.",
+        },
+        {
+          role: "user",
+          content: `Extract and clean product data from this page.
+
+Preliminary scrape results:
+- Name: ${basicData.name || "not found"}
+- Price: ${basicData.price ?? "not found"}
+- Store: ${basicData.store || "unknown"}
+- Image: ${basicData.image_url || "not found"}
+${tagContext}
+
+HTML (truncated):
+${truncatedHtml}
+
+Return JSON:
+{
+  "name": "Clean product name — remove SEO junk, store names, promotional text. Keep concise but descriptive.",
+  "price": number or null,
+  "image_url": "best product image URL from the page, or null if the existing one is good",
+  "suggested_tags": ["tag1"] (from user's existing tags only, or empty array),
+  "notes": "Brief 1-2 sentence product description for a wishlist note."
+}`,
+        },
+      ],
+    });
+
+    const content = completion.choices[0]?.message?.content;
+    if (!content) return null;
+
+    const parsed = JSON.parse(content);
+
+    return {
+      name: typeof parsed.name === "string" ? parsed.name : null,
+      price: typeof parsed.price === "number" ? Math.round(parsed.price * 100) / 100 : null,
+      image_url: typeof parsed.image_url === "string" && parsed.image_url.startsWith("http") ? parsed.image_url : null,
+      suggested_tags: Array.isArray(parsed.suggested_tags)
+        ? parsed.suggested_tags.filter((t: unknown) => typeof t === "string")
+        : [],
+      notes: typeof parsed.notes === "string" ? parsed.notes : null,
+    };
+  } catch {
+    // AI enhancement failed silently — fall back to basic scrape
+    return null;
+  }
+}
+
+// ── Main Handler ────────────────────────────────────────────────────
+
 export async function POST(request: Request) {
   try {
-    const { url } = await request.json();
+    const { url, existingTags } = await request.json();
 
     if (!url || typeof url !== "string") {
       return NextResponse.json(
@@ -323,6 +417,9 @@ export async function POST(request: Request) {
       store: getStoreName(url),
       currency: detectedCurrency,
       url,
+      suggested_tags: [],
+      notes: null,
+      ai_enhanced: false,
     };
 
     // Clean up the name (remove site name suffixes like " | Amazon.com" or " - Best Buy")
@@ -331,10 +428,31 @@ export async function POST(request: Request) {
         .replace(/\s*[\|–—-]\s*[^|–—-]*$/, "")
         .trim();
 
-      // If name is too long, truncate
       if (result.name.length > 200) {
         result.name = result.name.substring(0, 200).trim();
       }
+    }
+
+    // ── AI Enhancement Step ──
+    const aiResult = await enhanceWithAI(
+      html,
+      {
+        name: result.name,
+        price: result.price,
+        image_url: result.image_url,
+        store: result.store,
+        currency: result.currency,
+      },
+      Array.isArray(existingTags) ? existingTags : []
+    );
+
+    if (aiResult) {
+      if (aiResult.name) result.name = aiResult.name;
+      if (aiResult.price !== null) result.price = aiResult.price;
+      if (aiResult.image_url) result.image_url = aiResult.image_url;
+      result.suggested_tags = aiResult.suggested_tags;
+      result.notes = aiResult.notes;
+      result.ai_enhanced = true;
     }
 
     return NextResponse.json(result);
