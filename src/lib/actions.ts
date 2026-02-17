@@ -63,13 +63,20 @@ export async function addItem(formData: {
 
 export async function markPurchased(itemId: string) {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
 
-  // Get current price first
+  // Get current price first (scoped to user)
   const { data: item } = await supabase
     .from("wishlist_items")
     .select("current_price")
     .eq("id", itemId)
+    .eq("user_id", user.id)
     .single();
+
+  if (!item) throw new Error("Item not found");
 
   const { error } = await supabase
     .from("wishlist_items")
@@ -78,7 +85,8 @@ export async function markPurchased(itemId: string) {
       purchased_at: new Date().toISOString(),
       purchased_price: item?.current_price ?? null,
     })
-    .eq("id", itemId);
+    .eq("id", itemId)
+    .eq("user_id", user.id);
 
   if (error) throw error;
   revalidatePath("/");
@@ -86,10 +94,16 @@ export async function markPurchased(itemId: string) {
 
 export async function deleteItem(itemId: string) {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
   const { error } = await supabase
     .from("wishlist_items")
     .delete()
-    .eq("id", itemId);
+    .eq("id", itemId)
+    .eq("user_id", user.id);
 
   if (error) throw error;
   revalidatePath("/");
@@ -180,7 +194,16 @@ export async function createTag(name: string, color: string) {
 
 export async function deleteTag(tagId: string) {
   const supabase = createClient();
-  const { error } = await supabase.from("tags").delete().eq("id", tagId);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { error } = await supabase
+    .from("tags")
+    .delete()
+    .eq("id", tagId)
+    .eq("user_id", user.id);
 
   if (error) throw error;
   revalidatePath("/");

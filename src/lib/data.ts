@@ -3,6 +3,10 @@ import { WishlistItem, Tag, Profile } from "@/types";
 
 export async function getWishlistItems(): Promise<WishlistItem[]> {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
 
   const { data: items, error } = await supabase
     .from("wishlist_items")
@@ -15,6 +19,7 @@ export async function getWishlistItems(): Promise<WishlistItem[]> {
       price_history(*)
     `
     )
+    .eq("user_id", user.id)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -52,10 +57,15 @@ export async function getWishlistItems(): Promise<WishlistItem[]> {
 
 export async function getTags(): Promise<Tag[]> {
   const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return [];
 
   const { data, error } = await supabase
     .from("tags")
     .select("*")
+    .eq("user_id", user.id)
     .order("name");
 
   if (error) throw error;
