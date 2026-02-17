@@ -21,7 +21,6 @@
   "permissions": [
     "activeTab",
     "scripting",
-    "cookies",
     "storage"
   ],
   "host_permissions": [
@@ -31,5 +30,21 @@
   ],
   "background": {
     "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://wantry.vercel.app/auth/extension*",
+        "http://localhost:3000/auth/extension*"
+      ],
+      "js": ["auth-content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "externally_connectable": {
+    "matches": [
+      "https://wantry.vercel.app/*",
+      "http://localhost:3000/*"
+    ]
   }
 }

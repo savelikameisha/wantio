@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function setupLoginButton() {
   document.getElementById("btn-open-wantry").addEventListener("click", () => {
-    chrome.tabs.create({ url: wantryUrl });
+    chrome.tabs.create({ url: `${wantryUrl}/auth/extension` });
     window.close();
   });
 }
