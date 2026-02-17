@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   ExternalLink,
   Trash2,
@@ -19,6 +20,11 @@ interface ProductCardProps {
   onPriorityChange?: (id: string, priority: Priority) => void;
 }
 
+interface MenuPosition {
+  top: number;
+  left: number;
+}
+
 export function ProductCard({
   item,
   onMarkPurchased,
@@ -26,6 +32,8 @@ export function ProductCard({
 }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<MenuPosition>({ top: 0, left: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const priceChange =
@@ -37,17 +45,63 @@ export function ProductCard({
       ? Math.round((priceChange / item.original_price) * 100)
       : 0;
 
+  const updateMenuPosition = useCallback(() => {
+    if (!buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    const menuWidth = 176; // w-44 = 11rem = 176px
+    const menuHeight = item.url ? 132 : 88; // approx height based on items
+
+    // Position above the button, aligned to the right edge
+    let top = rect.top - menuHeight - 6 + window.scrollY;
+    let left = rect.right - menuWidth + window.scrollX;
+
+    // If menu would go above viewport, show below the button instead
+    if (rect.top - menuHeight - 6 < 0) {
+      top = rect.bottom + 6 + window.scrollY;
+    }
+
+    // If menu would go off the left edge, align to left edge of button
+    if (left < 8) {
+      left = rect.left + window.scrollX;
+    }
+
+    // If menu would go off the right edge
+    if (left + menuWidth > window.innerWidth - 8) {
+      left = window.innerWidth - menuWidth - 8 + window.scrollX;
+    }
+
+    setMenuPos({ top, left });
+  }, [item.url]);
+
   // Close menu when clicking outside
   useEffect(() => {
     if (!menuOpen) return;
     const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(e.target as Node) &&
+        buttonRef.current &&
+        !buttonRef.current.contains(e.target as Node)
+      ) {
         setMenuOpen(false);
       }
     };
+    const handleScroll = () => setMenuOpen(false);
     document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
+    window.addEventListener("scroll", handleScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      window.removeEventListener("scroll", handleScroll, true);
+    };
   }, [menuOpen]);
+
+  const toggleMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!menuOpen) {
+      updateMenuPosition();
+    }
+    setMenuOpen(!menuOpen);
+  };
 
   return (
     <div
@@ -122,59 +176,63 @@ export function ProductCard({
           </div>
 
           {/* Bottom: action menu button */}
-          <div className="absolute bottom-3 right-3" ref={menuRef}>
+          <div className="absolute bottom-3 right-3">
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuOpen(!menuOpen);
-              }}
+              ref={buttonRef}
+              onClick={toggleMenu}
               className="flex items-center justify-center h-9 w-9 rounded-full bg-white/90 text-black hover:bg-white transition-colors shadow-md"
             >
               <MoreHorizontal className="h-4 w-4" />
             </button>
-
-            {/* Dropdown menu */}
-            {menuOpen && (
-              <div className="absolute bottom-11 right-0 w-44 bg-white dark:bg-neutral-900 rounded-xl shadow-xl border border-black/10 dark:border-white/10 overflow-hidden z-50">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMarkPurchased?.(item.id);
-                    setMenuOpen(false);
-                  }}
-                  className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-sm text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                >
-                  <ShoppingCart className="h-4 w-4 text-neutral-500" />
-                  Purchased
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete?.(item.id);
-                    setMenuOpen(false);
-                  }}
-                  className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete
-                </button>
-                {item.url && (
-                  <a
-                    href={item.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-sm text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-                  >
-                    <ExternalLink className="h-4 w-4 text-neutral-500" />
-                    Open link
-                  </a>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>
+
+      {/* Portal dropdown menu — rendered at body level */}
+      {menuOpen &&
+        createPortal(
+          <div
+            ref={menuRef}
+            className="fixed w-44 bg-white dark:bg-neutral-900 rounded-xl shadow-xl border border-black/10 dark:border-white/10 overflow-hidden z-[9999] animate-in fade-in zoom-in-95 duration-100"
+            style={{ top: menuPos.top, left: menuPos.left, position: "absolute" }}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMarkPurchased?.(item.id);
+                setMenuOpen(false);
+              }}
+              className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-sm text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            >
+              <ShoppingCart className="h-4 w-4 text-neutral-500" />
+              Purchased
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete?.(item.id);
+                setMenuOpen(false);
+              }}
+              className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+            {item.url && (
+              <a
+                href={item.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-sm text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                <ExternalLink className="h-4 w-4 text-neutral-500" />
+                Open link
+              </a>
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
