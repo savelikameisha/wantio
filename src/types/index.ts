@@ -30,4 +30,17 @@ export interface WishlistItem {
   updated_at: string;
 }
 
+export interface Profile {
+  id: string;
+  display_name: string | null;
+  currency: string;
+  price_check_frequency: string;
+  public_share_enabled: boolean;
+  public_share_id: string;
+  notification_email: boolean;
+  notification_push: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export type ViewMode = "wishlist" | "purchased" | "settings";

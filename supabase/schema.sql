@@ -35,6 +35,11 @@ create policy "Users can insert own profile"
   on public.profiles for insert
   with check (auth.uid() = id);
 
+-- Allow public to view profiles that have sharing enabled (for shared wishlist pages)
+create policy "Public can view shared profiles"
+  on public.profiles for select
+  using (public_share_enabled = true);
+
 -- Auto-create profile on signup
 create or replace function public.handle_new_user()
 returns trigger as $$

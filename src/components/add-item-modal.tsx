@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Link2, PenLine } from "lucide-react";
+import { Link2, PenLine, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { addItem } from "@/lib/actions";
 import { Tag } from "@/types";
 
 interface AddItemModalProps {
@@ -33,6 +34,7 @@ export function AddItemModal({ open, onClose, availableTags }: AddItemModalProps
   const [store, setStore] = useState("");
   const [notes, setNotes] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const toggleTag = (tagId: string) => {
     setSelectedTags((prev) =>
@@ -40,11 +42,27 @@ export function AddItemModal({ open, onClose, availableTags }: AddItemModalProps
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Connect to Supabase
-    onClose();
-    resetForm();
+    setIsSubmitting(true);
+
+    try {
+      await addItem({
+        name: mode === "url" ? url : name,
+        url: url || undefined,
+        image_url: imageUrl || undefined,
+        current_price: price ? parseFloat(price) : undefined,
+        store: store || undefined,
+        notes: notes || undefined,
+        tagIds: selectedTags,
+      });
+      onClose();
+      resetForm();
+    } catch {
+      // TODO: Show error toast
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const resetForm = () => {
@@ -192,7 +210,10 @@ export function AddItemModal({ open, onClose, availableTags }: AddItemModalProps
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit">Add Item</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Add Item
+            </Button>
           </div>
         </form>
       </DialogContent>

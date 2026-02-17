@@ -9,6 +9,7 @@ import {
   Tags,
   Copy,
   Check,
+  LogOut,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -17,27 +18,72 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Tag } from "@/types";
+import { Tag, Profile } from "@/types";
+import { updateProfile } from "@/lib/actions";
 import { ThemeToggle } from "./theme-toggle";
 
 interface SettingsViewProps {
   tags: Tag[];
+  profile: Profile | null;
 }
 
-export function SettingsView({ tags }: SettingsViewProps) {
-  const [frequency, setFrequency] = useState("daily");
-  const [shareEnabled, setShareEnabled] = useState(false);
-  const [emailNotifs, setEmailNotifs] = useState(true);
-  const [pushNotifs, setPushNotifs] = useState(false);
-  const [currency, setCurrency] = useState("USD");
+export function SettingsView({ tags, profile }: SettingsViewProps) {
+  const [frequency, setFrequency] = useState(
+    profile?.price_check_frequency ?? "daily"
+  );
+  const [shareEnabled, setShareEnabled] = useState(
+    profile?.public_share_enabled ?? false
+  );
+  const [emailNotifs, setEmailNotifs] = useState(
+    profile?.notification_email ?? true
+  );
+  const [pushNotifs, setPushNotifs] = useState(
+    profile?.notification_push ?? false
+  );
+  const [currency, setCurrency] = useState(profile?.currency ?? "USD");
   const [copied, setCopied] = useState(false);
 
-  const shareLink = "https://wantry.app/shared/abc123-demo";
+  const shareLink = profile?.public_share_id
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/shared/${profile.public_share_id}`
+    : "";
 
   const handleCopy = () => {
     navigator.clipboard.writeText(shareLink);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleUpdate = async (data: Parameters<typeof updateProfile>[0]) => {
+    try {
+      await updateProfile(data);
+    } catch {
+      // TODO: Show error toast
+    }
+  };
+
+  const handleFrequency = (value: string) => {
+    setFrequency(value);
+    handleUpdate({ price_check_frequency: value });
+  };
+
+  const handleShareToggle = (value: boolean) => {
+    setShareEnabled(value);
+    handleUpdate({ public_share_enabled: value });
+  };
+
+  const handleEmailNotifs = (value: boolean) => {
+    setEmailNotifs(value);
+    handleUpdate({ notification_email: value });
+  };
+
+  const handlePushNotifs = (value: boolean) => {
+    setPushNotifs(value);
+    handleUpdate({ notification_push: value });
+  };
+
+  const handleCurrency = (value: string) => {
+    setCurrency(value);
+    handleUpdate({ currency: value });
   };
 
   const frequencies = [
@@ -72,7 +118,7 @@ export function SettingsView({ tags }: SettingsViewProps) {
               key={f.value}
               variant={frequency === f.value ? "default" : "outline"}
               size="sm"
-              onClick={() => setFrequency(f.value)}
+              onClick={() => handleFrequency(f.value)}
               className="flex-1 text-xs"
             >
               {f.label}
@@ -88,9 +134,9 @@ export function SettingsView({ tags }: SettingsViewProps) {
             <Globe className="h-4 w-4 text-muted-foreground" />
             <Label className="text-sm font-medium">Public Share Link</Label>
           </div>
-          <Switch checked={shareEnabled} onCheckedChange={setShareEnabled} />
+          <Switch checked={shareEnabled} onCheckedChange={handleShareToggle} />
         </div>
-        {shareEnabled && (
+        {shareEnabled && shareLink && (
           <div className="flex gap-2">
             <Input
               value={shareLink}
@@ -127,14 +173,14 @@ export function SettingsView({ tags }: SettingsViewProps) {
             <Label className="text-sm text-muted-foreground">
               Email notifications
             </Label>
-            <Switch checked={emailNotifs} onCheckedChange={setEmailNotifs} />
+            <Switch checked={emailNotifs} onCheckedChange={handleEmailNotifs} />
           </div>
           <Separator />
           <div className="flex items-center justify-between">
             <Label className="text-sm text-muted-foreground">
               Push notifications
             </Label>
-            <Switch checked={pushNotifs} onCheckedChange={setPushNotifs} />
+            <Switch checked={pushNotifs} onCheckedChange={handlePushNotifs} />
           </div>
         </div>
       </Card>
@@ -151,7 +197,7 @@ export function SettingsView({ tags }: SettingsViewProps) {
               key={c}
               variant={currency === c ? "default" : "outline"}
               size="sm"
-              onClick={() => setCurrency(c)}
+              onClick={() => handleCurrency(c)}
               className="text-xs"
             >
               {c}
@@ -187,6 +233,20 @@ export function SettingsView({ tags }: SettingsViewProps) {
             </Badge>
           ))}
         </div>
+      </Card>
+
+      {/* Sign Out */}
+      <Card className="p-4 border-border/50">
+        <form action="/auth/signout" method="post">
+          <Button
+            type="submit"
+            variant="outline"
+            className="w-full text-muted-foreground hover:text-destructive"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Sign Out
+          </Button>
+        </form>
       </Card>
     </div>
   );
