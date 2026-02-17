@@ -10,9 +10,7 @@ export function LandingPage() {
       {/* Header */}
       <header className="w-full px-4 py-4 flex items-center justify-between max-w-5xl mx-auto">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">W</span>
-          </div>
+          <img src="/icon.svg" alt="Wantry" className="h-8 w-8" />
           <span className="text-base font-semibold tracking-tight">Wantry</span>
         </div>
         <div className="flex items-center gap-2">

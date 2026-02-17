@@ -136,9 +136,7 @@ export function WishlistDashboard({
         <div className="w-full px-4 py-3 flex items-center gap-4">
           {/* Logo */}
           <div className="flex items-center gap-2 shrink-0">
-            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">W</span>
-            </div>
+            <img src="/icon.svg" alt="Wantry" className="h-8 w-8" />
             <span className="text-base font-semibold tracking-tight hidden sm:block">
               Wantry
             </span>
