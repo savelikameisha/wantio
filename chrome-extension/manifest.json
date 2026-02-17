@@ -25,6 +25,7 @@
     "storage"
   ],
   "host_permissions": [
+    "https://wantry.vercel.app/*",
     "http://localhost:3000/*",
     "https://*.supabase.co/*"
   ],

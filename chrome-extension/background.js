@@ -3,7 +3,7 @@
 
 const SUPABASE_PROJECT_REF = "fxjzqbdlroeeifqzfhbl";
 const COOKIE_PREFIX = `sb-${SUPABASE_PROJECT_REF}-auth-token`;
-const DEFAULT_WANTRY_URL = "http://localhost:3000";
+const DEFAULT_WANTRY_URL = "https://wantry.vercel.app";
 
 // Get the configured Wantry app URL
 async function getWantryUrl() {

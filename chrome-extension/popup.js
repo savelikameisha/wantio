@@ -6,7 +6,7 @@ const SUPABASE_ANON_KEY =
 
 // State
 let accessToken = null;
-let wantryUrl = "http://localhost:3000";
+let wantryUrl = "https://wantry.vercel.app";
 let selectedTagIds = new Set();
 let allTags = [];
 let productData = {};
