@@ -22,7 +22,7 @@ export default function Loading() {
                   className="mb-4 rounded-2xl bg-muted animate-pulse break-inside-avoid"
                   style={{ height }}
                 />
-              )
+              ),
             )}
           </div>
         </div>

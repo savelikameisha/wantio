@@ -1,6 +1,12 @@
+import { readJson, RequestSizeError } from "@/lib/server/request";
 import { NextResponse } from "next/server";
 import * as cheerio from "cheerio";
 import OpenAI from "openai";
+import { parsePrice } from "@/lib/price";
+import { fetchProductHtml } from "@/lib/server/safe-fetch";
+import { authenticatedClient } from "@/lib/server/auth";
+import { z } from "zod";
+import { webUrl } from "@/lib/validation";
 
 interface ScrapedData {
   name: string | null;
@@ -16,12 +22,27 @@ interface ScrapedData {
 
 // Domain-based currency detection
 const DOMAIN_CURRENCIES: Record<string, string> = {
-  ".co.uk": "GBP", ".de": "EUR", ".fr": "EUR", ".it": "EUR",
-  ".es": "EUR", ".nl": "EUR", ".be": "EUR", ".at": "EUR",
-  ".ca": "CAD", ".co.jp": "JPY", ".jp": "JPY",
-  ".com.au": "AUD", ".co.kr": "KRW", ".co.in": "INR",
-  ".com.br": "BRL", ".com.mx": "MXN", ".se": "SEK",
-  ".no": "NOK", ".dk": "DKK", ".pl": "PLN", ".ch": "CHF",
+  ".co.uk": "GBP",
+  ".de": "EUR",
+  ".fr": "EUR",
+  ".it": "EUR",
+  ".es": "EUR",
+  ".nl": "EUR",
+  ".be": "EUR",
+  ".at": "EUR",
+  ".ca": "CAD",
+  ".co.jp": "JPY",
+  ".jp": "JPY",
+  ".com.au": "AUD",
+  ".co.kr": "KRW",
+  ".co.in": "INR",
+  ".com.br": "BRL",
+  ".com.mx": "MXN",
+  ".se": "SEK",
+  ".no": "NOK",
+  ".dk": "DKK",
+  ".pl": "PLN",
+  ".ch": "CHF",
 };
 
 function detectCurrencyFromDomain(url: string): string | null {
@@ -30,11 +51,15 @@ function detectCurrencyFromDomain(url: string): string | null {
     for (const [suffix, currency] of Object.entries(DOMAIN_CURRENCIES)) {
       if (hostname.endsWith(suffix)) return currency;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return null;
 }
 
-function detectCurrencyFromPrice(priceStr: string | undefined | null): string | null {
+function detectCurrencyFromPrice(
+  priceStr: string | undefined | null,
+): string | null {
   if (!priceStr) return null;
   const s = priceStr.trim();
   if (s.startsWith("€") || s.includes("EUR")) return "EUR";
@@ -94,7 +119,7 @@ function getStoreName(url: string): string | null {
     if (STORE_NAMES[hostname]) return STORE_NAMES[hostname];
 
     for (const [domain, name] of Object.entries(STORE_NAMES)) {
-      if (hostname.endsWith(domain)) return name;
+      if (hostname === domain || hostname.endsWith("." + domain)) return name;
     }
 
     const parts = hostname.split(".");
@@ -109,25 +134,18 @@ function getStoreName(url: string): string | null {
   }
 }
 
-function parsePrice(priceStr: string | undefined | null): number | null {
-  if (!priceStr) return null;
-
-  const cleaned = priceStr
-    .replace(/[^0-9.,]/g, "")
-    .replace(/,(\d{2})$/, ".$1")
-    .replace(/,/g, "");
-
-  const num = parseFloat(cleaned);
-  return isNaN(num) ? null : Math.round(num * 100) / 100;
-}
-
 function extractJsonLd($: cheerio.CheerioAPI): {
   name?: string;
   price?: number | null;
   image?: string;
   currency?: string;
 } {
-  const result: { name?: string; price?: number | null; image?: string; currency?: string } = {};
+  const result: {
+    name?: string;
+    price?: number | null;
+    image?: string;
+    currency?: string;
+  } = {};
 
   $('script[type="application/ld+json"]').each((_, el) => {
     try {
@@ -142,7 +160,7 @@ function extractJsonLd($: cheerio.CheerioAPI): {
           item["@type"] === "Product"
             ? item
             : item["@graph"]?.find(
-                (g: { "@type"?: string }) => g["@type"] === "Product"
+                (g: { "@type"?: string }) => g["@type"] === "Product",
               );
 
         if (product) {
@@ -160,8 +178,7 @@ function extractJsonLd($: cheerio.CheerioAPI): {
           const offers = product.offers;
           if (offers && !result.price) {
             const offer = Array.isArray(offers) ? offers[0] : offers;
-            const price =
-              offer.price ?? offer.lowPrice ?? offer.highPrice;
+            const price = offer.price ?? offer.lowPrice ?? offer.highPrice;
             if (price) {
               result.price = parsePrice(String(price));
             }
@@ -189,7 +206,10 @@ function truncateHtml(html: string, maxLength: number = 15000): string {
   const bodyContent = bodyMatch ? bodyMatch[1] || "" : html;
   const remainingLength = maxLength - head.length;
 
-  return head + bodyContent.substring(0, Math.max(0, remainingLength));
+  return (head + bodyContent.substring(0, Math.max(0, remainingLength))).slice(
+    0,
+    maxLength,
+  );
 }
 
 async function enhanceWithAI(
@@ -201,7 +221,7 @@ async function enhanceWithAI(
     store: string | null;
     currency: string | null;
   },
-  existingTags: string[]
+  existingTags: string[],
 ): Promise<{
   name: string | null;
   price: number | null;
@@ -213,12 +233,13 @@ async function enhanceWithAI(
   if (!apiKey) return null;
 
   try {
-    const openai = new OpenAI({ apiKey });
+    const openai = new OpenAI({ apiKey, timeout: 12000, maxRetries: 0 });
     const truncatedHtml = truncateHtml(html);
 
-    const tagContext = existingTags.length > 0
-      ? `\nUser's existing tags: [${existingTags.join(", ")}]\nSelect 0-3 tags from this list that fit the product. Only use exact tag names from this list.`
-      : "\nNo existing tags available. Return an empty suggested_tags array.";
+    const tagContext =
+      existingTags.length > 0
+        ? `\nUser's existing tags: [${existingTags.join(", ")}]\nSelect 0-3 tags from this list that fit the product. Only use exact tag names from this list.`
+        : "\nNo existing tags available. Return an empty suggested_tags array.";
 
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
@@ -228,7 +249,8 @@ async function enhanceWithAI(
       messages: [
         {
           role: "system",
-          content: "You are a product data extraction assistant. Return only valid JSON.",
+          content:
+            "You are a product data extraction assistant. Return only valid JSON.",
         },
         {
           role: "user",
@@ -263,10 +285,21 @@ Return JSON:
 
     return {
       name: typeof parsed.name === "string" ? parsed.name : null,
-      price: typeof parsed.price === "number" ? Math.round(parsed.price * 100) / 100 : null,
-      image_url: typeof parsed.image_url === "string" && parsed.image_url.startsWith("http") ? parsed.image_url : null,
+      price:
+        typeof parsed.price === "number"
+          ? Math.round(parsed.price * 100) / 100
+          : null,
+      image_url:
+        typeof parsed.image_url === "string" &&
+        parsed.image_url.startsWith("http")
+          ? parsed.image_url
+          : null,
       suggested_tags: Array.isArray(parsed.suggested_tags)
-        ? parsed.suggested_tags.filter((t: unknown) => typeof t === "string")
+        ? parsed.suggested_tags
+            .filter(
+              (t: unknown) => typeof t === "string" && existingTags.includes(t),
+            )
+            .slice(0, 3)
         : [],
       notes: typeof parsed.notes === "string" ? parsed.notes : null,
     };
@@ -279,51 +312,48 @@ Return JSON:
 // ── Main Handler ────────────────────────────────────────────────────
 
 export async function POST(request: Request) {
+  let client;
   try {
-    const { url, existingTags } = await request.json();
-
-    if (!url || typeof url !== "string") {
+    ({ client } = await authenticatedClient(request));
+  } catch {
+    return NextResponse.json(
+      { error: "Sign in to continue." },
+      { status: 401 },
+    );
+  }
+  try {
+    const body = z
+      .object({
+        url: webUrl,
+        existingTags: z.array(z.string().max(40)).max(100).default([]),
+      })
+      .safeParse(await readJson(request));
+    if (!body.success)
       return NextResponse.json(
-        { error: "URL is required" },
-        { status: 400 }
+        { error: "Enter a valid product URL." },
+        { status: 400 },
       );
-    }
-
-    // Validate URL
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(url);
-      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-        throw new Error("Invalid protocol");
-      }
-    } catch {
+    const { data: allowed, error: quotaError } = await client.rpc(
+      "consume_scrape_quota",
+    );
+    if (quotaError)
       return NextResponse.json(
-        { error: "Invalid URL" },
-        { status: 400 }
+        {
+          error:
+            "Product lookup is temporarily unavailable. Add details manually.",
+        },
+        { status: 503 },
       );
-    }
-
-    // Fetch the page
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-      },
-      redirect: "follow",
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (!response.ok) {
+    if (!allowed)
       return NextResponse.json(
-        { error: `Failed to fetch URL (${response.status})` },
-        { status: 422 }
+        {
+          error:
+            "You have reached the hourly lookup limit. Add details manually or try later.",
+        },
+        { status: 429 },
       );
-    }
-
-    const html = await response.text();
+    const { existingTags } = body.data;
+    const { html, url } = await fetchProductHtml(body.data.url);
     const $ = cheerio.load(html);
 
     // 1. Try JSON-LD structured data first (most reliable)
@@ -354,17 +384,17 @@ export async function POST(request: Request) {
     // 5. Try to find price in common selectors
     let selectorPrice: number | null = null;
     const priceSelectors = [
-      '[data-price]',
-      '.price',
-      '#price',
-      '.product-price',
-      '.current-price',
+      "[data-price]",
+      ".price",
+      "#price",
+      ".product-price",
+      ".current-price",
       '[class*="price"] [class*="current"]',
       '[class*="Price"]',
-      '.a-price .a-offscreen', // Amazon
-      '#priceblock_ourprice', // Amazon
-      '#priceblock_dealprice', // Amazon
-      '.price-characteristic', // Walmart
+      ".a-price .a-offscreen", // Amazon
+      "#priceblock_ourprice", // Amazon
+      "#priceblock_dealprice", // Amazon
+      ".price-characteristic", // Walmart
       '[data-test="product-price"]', // Target
     ];
 
@@ -388,7 +418,11 @@ export async function POST(request: Request) {
     };
 
     // Detect currency: JSON-LD > OG > price string > domain TLD
-    const rawPriceStr = $('[data-price]').first().text() || $('.price').first().text() || ogPrice || "";
+    const rawPriceStr =
+      $("[data-price]").first().text() ||
+      $(".price").first().text() ||
+      ogPrice ||
+      "";
     const detectedCurrency =
       jsonLd.currency ||
       ogCurrency ||
@@ -398,17 +432,8 @@ export async function POST(request: Request) {
 
     // Assemble result with priority: JSON-LD > OG > Twitter > Selectors > Page
     const result: ScrapedData = {
-      name:
-        jsonLd.name ||
-        ogTitle ||
-        twitterTitle ||
-        pageTitle ||
-        null,
-      price:
-        jsonLd.price ??
-        parsePrice(ogPrice) ??
-        selectorPrice ??
-        null,
+      name: jsonLd.name || ogTitle || twitterTitle || pageTitle || null,
+      price: jsonLd.price ?? parsePrice(ogPrice) ?? selectorPrice ?? null,
       image_url:
         resolveUrl(jsonLd.image) ||
         resolveUrl(ogImage) ||
@@ -424,9 +449,7 @@ export async function POST(request: Request) {
 
     // Clean up the name (remove site name suffixes like " | Amazon.com" or " - Best Buy")
     if (result.name) {
-      result.name = result.name
-        .replace(/\s*[\|–—-]\s*[^|–—-]*$/, "")
-        .trim();
+      result.name = result.name.replace(/\s*[\|–—-]\s*[^|–—-]*$/, "").trim();
 
       if (result.name.length > 200) {
         result.name = result.name.substring(0, 200).trim();
@@ -443,12 +466,17 @@ export async function POST(request: Request) {
         store: result.store,
         currency: result.currency,
       },
-      Array.isArray(existingTags) ? existingTags : []
+      Array.isArray(existingTags) ? existingTags : [],
     );
 
     if (aiResult) {
       if (aiResult.name) result.name = aiResult.name;
-      if (aiResult.price !== null) result.price = aiResult.price;
+      if (
+        result.price === null &&
+        aiResult.price !== null &&
+        aiResult.price >= 0
+      )
+        result.price = aiResult.price;
       if (aiResult.image_url) result.image_url = aiResult.image_url;
       result.suggested_tags = aiResult.suggested_tags;
       result.notes = aiResult.notes;
@@ -457,19 +485,25 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown error";
+    if (error instanceof RequestSizeError)
+      return NextResponse.json({ error: error.message }, { status: 413 });
+    if (error instanceof SyntaxError)
+      return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+    const message = error instanceof Error ? error.message : "Unknown error";
 
     if (message.includes("timeout") || message.includes("abort")) {
       return NextResponse.json(
-        { error: "Request timed out. The site may be too slow or blocking requests." },
-        { status: 408 }
+        {
+          error:
+            "Request timed out. The site may be too slow or blocking requests.",
+        },
+        { status: 408 },
       );
     }
 
     return NextResponse.json(
       { error: "Failed to scrape URL" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

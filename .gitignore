@@ -34,3 +34,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+supabase/.temp/
+playwright-report/
+test-results/
+.env.local
+
+/public/wantio-extension.zip

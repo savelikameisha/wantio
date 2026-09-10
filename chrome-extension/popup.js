@@ -1,15 +1,15 @@
-// Wantry Chrome Extension — Popup Logic
+// Wantio Chrome Extension — Popup Logic
 
-const SUPABASE_URL = "https://fxjzqbdlroeeifqzfhbl.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4anpxYmRscm9lZWlmcXpmaGJsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzMzYwODgsImV4cCI6MjA4NjkxMjA4OH0.jVUiW5GMgqDx2n-WkCpjgAHhWgpnphC2RZi7m1eFKDQ";
-
+let supabaseUrl, supabaseAnonKey;
 // State
 let accessToken = null;
-let wantryUrl = "https://wantry.vercel.app";
+let wantioUrl = "https://wantio-saveli-desings.vercel.app";
 let selectedTagIds = new Set();
 let allTags = [];
 let productData = {};
+let saving = false;
+const itemId = crypto.randomUUID();
+let userEdited = false;
 
 // DOM refs
 const states = {
@@ -29,13 +29,21 @@ function showState(name) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   showState("loading");
+  document.querySelectorAll("input,textarea").forEach((el) =>
+    el.addEventListener("input", () => {
+      userEdited = true;
+    }),
+  );
 
   try {
-    // Get Wantry URL from storage
+    // Get Wantio URL from storage
     const urlResult = await chrome.runtime.sendMessage({
-      type: "GET_WANTRY_URL",
+      type: "GET_CONFIG",
     });
-    if (urlResult?.url) wantryUrl = urlResult.url;
+    if (urlResult?.error) throw new Error(urlResult.error);
+    if (urlResult?.url) wantioUrl = urlResult.url;
+    supabaseUrl = urlResult.supabaseUrl;
+    supabaseAnonKey = urlResult.supabaseAnonKey;
 
     // Check auth session
     const session = await chrome.runtime.sendMessage({ type: "GET_SESSION" });
@@ -54,8 +62,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       currentWindow: true,
     });
 
-    if (!tab?.id || tab.url?.startsWith("chrome://") || tab.url?.startsWith("about:")) {
-      showError("Cannot extract data from this page. Navigate to a product page and try again.");
+    if (
+      !tab?.id ||
+      tab.url?.startsWith("chrome://") ||
+      tab.url?.startsWith("about:")
+    ) {
+      showError(
+        "Cannot extract data from this page. Navigate to a product page and try again.",
+      );
       return;
     }
 
@@ -64,7 +78,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try {
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        files: ["content.js"],
+        files: ["price.js", "content.js"],
       });
       contentData = results?.[0]?.result;
     } catch {
@@ -81,10 +95,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     // Fetch tags and AI-enhanced scrape in parallel
-    await Promise.all([
-      fetchTags(),
-      fetchAiScrape(tab.url),
-    ]);
+    await fetchTags();
+    await fetchAiScrape(tab.url);
   } catch (err) {
     showError(err.message || "Something went wrong");
   }
@@ -93,8 +105,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 // ── Login ─────────────────────────────────────────────────────────────
 
 function setupLoginButton() {
-  document.getElementById("btn-open-wantry").addEventListener("click", () => {
-    chrome.tabs.create({ url: `${wantryUrl}/auth/extension` });
+  document.getElementById("btn-open-wantio").addEventListener("click", () => {
+    chrome.tabs.create({ url: `${wantioUrl}/auth/extension` });
     window.close();
   });
 }
@@ -127,7 +139,7 @@ function displayForm(data) {
 
   // Form inputs
   document.getElementById("input-name").value = data.name || "";
-  document.getElementById("input-price").value = data.price || "";
+  document.getElementById("input-price").value = data.price ?? "";
   document.getElementById("input-currency").value = data.currency || "USD";
   document.getElementById("input-store").value = data.store || "";
   document.getElementById("input-notes").value = data.notes || "";
@@ -137,11 +149,12 @@ function displayForm(data) {
 }
 
 function updateFormWithAiData(data) {
+  if (userEdited || saving) return;
   if (data.name) {
     document.getElementById("input-name").value = data.name;
     document.getElementById("product-name-preview").textContent = data.name;
   }
-  if (data.price) {
+  if (data.price != null) {
     document.getElementById("input-price").value = data.price;
     document.getElementById("product-price-preview").textContent =
       `${getCurrencySymbol(data.currency)}${data.price}`;
@@ -171,7 +184,7 @@ function updateFormWithAiData(data) {
   if (data.suggested_tags && Array.isArray(data.suggested_tags)) {
     data.suggested_tags.forEach((tagName) => {
       const tag = allTags.find(
-        (t) => t.name.toLowerCase() === tagName.toLowerCase()
+        (t) => t.name.toLowerCase() === tagName.toLowerCase(),
       );
       if (tag) {
         selectedTagIds.add(tag.id);
@@ -188,9 +201,9 @@ function updateFormWithAiData(data) {
 
 async function fetchTags() {
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/tags?select=*&order=name`, {
+    const res = await fetch(`${supabaseUrl}/rest/v1/tags?select=*&order=name`, {
       headers: {
-        apikey: SUPABASE_ANON_KEY,
+        apikey: supabaseAnonKey,
         Authorization: `Bearer ${accessToken}`,
       },
     });
@@ -216,7 +229,9 @@ function renderTags() {
   container.innerHTML = "";
 
   allTags.forEach((tag) => {
-    const badge = document.createElement("span");
+    const badge = document.createElement("button");
+    badge.type = "button";
+    badge.setAttribute("aria-pressed", String(selectedTagIds.has(tag.id)));
     badge.className = `tag-badge${selectedTagIds.has(tag.id) ? " selected" : ""}`;
     badge.textContent = tag.name;
 
@@ -226,6 +241,8 @@ function renderTags() {
     }
 
     badge.addEventListener("click", () => {
+      userEdited = true;
+      badge.setAttribute("aria-pressed", String(!selectedTagIds.has(tag.id)));
       if (selectedTagIds.has(tag.id)) {
         selectedTagIds.delete(tag.id);
         badge.classList.remove("selected");
@@ -249,9 +266,12 @@ async function fetchAiScrape(url) {
   try {
     const tagNames = allTags.map((t) => t.name);
 
-    const res = await fetch(`${wantryUrl}/api/scrape`, {
+    const res = await fetch(`${wantioUrl}/api/scrape`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
       body: JSON.stringify({ url, existingTags: tagNames }),
     });
 
@@ -267,6 +287,8 @@ async function fetchAiScrape(url) {
 // ── Save ──────────────────────────────────────────────────────────────
 
 async function handleSave() {
+  if (saving) return;
+  saving = true;
   const btn = document.getElementById("btn-save");
   const btnText = document.getElementById("btn-save-text");
   const btnSpinner = document.getElementById("btn-save-spinner");
@@ -285,6 +307,7 @@ async function handleSave() {
     const price = priceStr ? parseFloat(priceStr) : undefined;
 
     const body = {
+      id: itemId,
       name,
       url: productData.url || undefined,
       image_url: productData.image_url || undefined,
@@ -295,7 +318,10 @@ async function handleSave() {
       tagIds: Array.from(selectedTagIds),
     };
 
-    const res = await fetch(`${wantryUrl}/api/items`, {
+    const latest = await chrome.runtime.sendMessage({ type: "GET_SESSION" });
+    if (!latest?.access_token) throw new Error("Sign in to Wantio again.");
+    accessToken = latest.access_token;
+    const res = await fetch(`${wantioUrl}/api/items`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -305,7 +331,7 @@ async function handleSave() {
     });
 
     if (!res.ok) {
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       throw new Error(data.error || "Failed to save item");
     }
 
@@ -313,10 +339,11 @@ async function handleSave() {
     showState("success");
     setTimeout(() => window.close(), 1500);
   } catch (err) {
+    saving = false;
     btn.disabled = false;
     btnText.textContent = "Save to Wishlist";
     btnSpinner.style.display = "none";
-    showError(err.message);
+    document.getElementById("save-error").textContent = err.message;
   }
 }
 

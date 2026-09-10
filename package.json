@@ -1,12 +1,17 @@
 {
-  "name": "wantry",
+  "name": "wantio",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "eslint .",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "build:extension": "node scripts/build-extension.mjs",
+    "prebuild": "npm run build:extension"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",
@@ -21,23 +26,33 @@
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "ipaddr.js": "^2.5.0",
     "lucide-react": "^0.572.0",
-    "next": "14.2.35",
+    "next": "^16.3.4",
     "next-themes": "^0.4.6",
     "openai": "^6.22.0",
-    "react": "^18",
-    "react-dom": "^18",
-    "tailwind-merge": "^3.4.1",
-    "tailwindcss-animate": "^1.0.7"
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "tailwind-merge": "^2.6.0",
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^4.6.1"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.35",
-    "postcss": "^8",
+    "@playwright/test": "^1.63.0",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/node": "^24.13.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.4",
+    "jsdom": "^30.0.1",
+    "postcss": "^8.5.28",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.0"
+  },
+  "engines": {
+    "node": "24.x"
   }
 }

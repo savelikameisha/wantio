@@ -1,256 +1,53 @@
 "use client";
-
-import { useState, useRef, useEffect, useCallback } from "react";
-import { createPortal } from "react-dom";
-import {
-  ExternalLink,
-  Trash2,
-  ShoppingCart,
-  TrendingDown,
-  TrendingUp,
-  MoreHorizontal,
-  Pencil,
-} from "lucide-react";
-import { cn, getCurrencySymbol } from "@/lib/utils";
 import { WishlistItem } from "@/types";
 import { ImageWithFallback } from "./image-with-fallback";
-
-interface ProductCardProps {
-  item: WishlistItem;
-  onMarkPurchased?: (id: string) => void;
-  onDelete?: (id: string) => void;
-  onEdit?: (item: WishlistItem) => void;
-  onTap?: (item: WishlistItem) => void;
-}
-
-interface MenuPosition {
-  top: number;
-  left: number;
-}
-
+import { formatMoney } from "@/lib/price";
 export function ProductCard({
   item,
-  onMarkPurchased,
-  onDelete,
-  onEdit,
   onTap,
-}: ProductCardProps) {
-  const [isHovered, setIsHovered] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [menuPos, setMenuPos] = useState<MenuPosition>({ top: 0, left: 0 });
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const currSymbol = getCurrencySymbol(item.currency);
-
-  const priceChange =
-    item.original_price && item.current_price
-      ? item.current_price - item.original_price
-      : 0;
-  const priceChangePercent =
-    item.original_price && priceChange
-      ? Math.round((priceChange / item.original_price) * 100)
-      : 0;
-
-  const updateMenuPosition = useCallback(() => {
-    if (!buttonRef.current) return;
-    const rect = buttonRef.current.getBoundingClientRect();
-    const menuWidth = 176;
-    const menuHeight = item.url ? 176 : 132;
-
-    let top = rect.top - menuHeight - 6 + window.scrollY;
-    let left = rect.right - menuWidth + window.scrollX;
-
-    if (rect.top - menuHeight - 6 < 0) {
-      top = rect.bottom + 6 + window.scrollY;
-    }
-    if (left < 8) {
-      left = rect.left + window.scrollX;
-    }
-    if (left + menuWidth > window.innerWidth - 8) {
-      left = window.innerWidth - menuWidth - 8 + window.scrollX;
-    }
-
-    setMenuPos({ top, left });
-  }, [item.url]);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(e.target as Node) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(e.target as Node)
-      ) {
-        setMenuOpen(false);
-      }
-    };
-    const handleScroll = () => setMenuOpen(false);
-    document.addEventListener("mousedown", handleClick);
-    window.addEventListener("scroll", handleScroll, true);
-    return () => {
-      document.removeEventListener("mousedown", handleClick);
-      window.removeEventListener("scroll", handleScroll, true);
-    };
-  }, [menuOpen]);
-
-  const toggleMenu = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!menuOpen) {
-      updateMenuPosition();
-    }
-    setMenuOpen(!menuOpen);
-  };
-
-  const handleCardClick = () => {
-    if (
-      typeof window !== "undefined" &&
-      window.matchMedia("(hover: none)").matches
-    ) {
-      onTap?.(item);
-    }
-  };
-
+}: {
+  item: WishlistItem;
+  onTap?: (item: WishlistItem) => void;
+}) {
   return (
-    <div
-      className="group relative break-inside-avoid mb-4"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => {
-        setIsHovered(false);
-        setMenuOpen(false);
-      }}
-      onClick={handleCardClick}
-    >
-      <div className="relative overflow-hidden rounded-2xl bg-muted">
+    <article className="overflow-hidden rounded-2xl border border-border/60 bg-card">
+      <button
+        onClick={() => onTap?.(item)}
+        className="block w-full text-left"
+        aria-label={`View ${item.name}`}
+      >
         <ImageWithFallback
           src={item.image_url}
-          alt={item.name}
-          className="w-full block transition-transform duration-500 group-hover:scale-[1.02]"
+          alt=""
+          className="w-full h-full object-contain p-3"
           fallbackClassName="aspect-square w-full"
         />
-
-        {/* Price change pill */}
-        {priceChange !== 0 && !isHovered && (
-          <div
-            className={cn(
-              "absolute top-3 left-3 flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold backdrop-blur-md shadow-sm",
-              priceChange < 0
-                ? "bg-green-500/90 text-white"
-                : "bg-red-500/90 text-white"
-            )}
-          >
-            {priceChange < 0 ? (
-              <TrendingDown className="h-3 w-3" />
-            ) : (
-              <TrendingUp className="h-3 w-3" />
-            )}
-            {Math.abs(priceChangePercent)}%
-          </div>
-        )}
-
-        {/* Hover overlay */}
-        <div
-          className={cn(
-            "absolute inset-0 rounded-2xl transition-opacity duration-200",
-            "bg-gradient-to-t from-black/70 via-black/20 to-transparent",
-            isHovered ? "opacity-100" : "opacity-0 pointer-events-none"
-          )}
-        >
-          <div className="absolute top-0 left-0 right-0 p-3">
-            <h3 className="font-semibold text-white text-sm leading-tight truncate drop-shadow-sm">
-              {item.name}
-            </h3>
-            <div className="flex items-baseline gap-1.5 mt-0.5">
-              {item.current_price != null && (
-                <span className="font-bold text-white text-base drop-shadow-sm">
-                  {currSymbol}
-                  {item.current_price.toFixed(2)}
-                </span>
-              )}
-              {item.original_price != null &&
-                item.current_price != null &&
-                item.original_price !== item.current_price && (
-                  <span className="text-[11px] text-white/50 line-through">
-                    {currSymbol}
-                    {item.original_price.toFixed(2)}
-                  </span>
-                )}
-            </div>
-          </div>
-
-          <div className="absolute bottom-3 right-3">
-            <button
-              ref={buttonRef}
-              onClick={toggleMenu}
-              className="flex items-center justify-center h-9 w-9 rounded-full bg-white/90 text-black hover:bg-white transition-colors shadow-md"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
-          </div>
+        <div className="p-3 space-y-1.5">
+          <h2 className="font-medium text-sm line-clamp-2 min-h-10">
+            {item.name}
+          </h2>
+          <p className="font-semibold tabular-nums">
+            {item.current_price != null
+              ? formatMoney(item.current_price, item.currency)
+              : "Price not set"}
+          </p>
+          <p className="text-xs text-muted-foreground truncate">
+            {item.store || "Saved item"}
+          </p>
         </div>
-      </div>
-
-      {/* Portal dropdown */}
-      {menuOpen &&
-        createPortal(
-          <div
-            ref={menuRef}
-            className="fixed w-44 bg-white dark:bg-neutral-900 rounded-xl shadow-xl border border-black/10 dark:border-white/10 overflow-hidden z-[9999] animate-in fade-in zoom-in-95 duration-100"
-            style={{
-              top: menuPos.top,
-              left: menuPos.left,
-              position: "absolute",
-            }}
-          >
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit?.(item);
-                setMenuOpen(false);
-              }}
-              className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-sm text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+      </button>
+      {!!item.tags.length && (
+        <div className="px-3 pb-3 flex gap-1 flex-wrap">
+          {item.tags.map((t) => (
+            <span
+              key={t.id}
+              className="text-xs rounded-full bg-muted px-2 py-1"
             >
-              <Pencil className="h-4 w-4 text-neutral-500" />
-              Edit
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onMarkPurchased?.(item.id);
-                setMenuOpen(false);
-              }}
-              className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-sm text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-            >
-              <ShoppingCart className="h-4 w-4 text-neutral-500" />
-              Purchased
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete?.(item.id);
-                setMenuOpen(false);
-              }}
-              className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </button>
-            {item.url && (
-              <a
-                href={item.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => e.stopPropagation()}
-                className="flex items-center gap-2.5 w-full px-3.5 py-2.5 text-sm text-neutral-800 dark:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-              >
-                <ExternalLink className="h-4 w-4 text-neutral-500" />
-                Open link
-              </a>
-            )}
-          </div>,
-          document.body
-        )}
-    </div>
+              {t.name}
+            </span>
+          ))}
+        </div>
+      )}
+    </article>
   );
 }

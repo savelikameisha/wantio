@@ -1,46 +1,28 @@
-// Wantry Chrome Extension — Auth Content Script
-// Runs on the /auth/extension page to grab the session token and send it to the extension
-
+// One-time handoff from the first-party sign-in page, with delivery acknowledgement.
 (function () {
-  // Wait for the page to store the token in sessionStorage
-  function checkForToken() {
-    const tokenStr = sessionStorage.getItem("wantry_ext_token");
-    if (tokenStr) {
-      try {
-        const token = JSON.parse(tokenStr);
-        // Send to extension background
-        chrome.runtime.sendMessage(
-          {
-            type: "AUTH_TOKEN",
-            access_token: token.access_token,
-            refresh_token: token.refresh_token,
-            user: token.user,
-          },
-          (response) => {
-            if (response?.ok) {
-              // Clean up
-              sessionStorage.removeItem("wantry_ext_token");
-              console.log("[Wantry] Token sent to extension successfully");
-            }
-          }
-        );
-        return true;
-      } catch {
-        return false;
-      }
-    }
-    return false;
-  }
-
-  // Check immediately
-  if (checkForToken()) return;
-
-  // Poll for the token (the page sets it asynchronously)
   let attempts = 0;
-  const interval = setInterval(() => {
-    attempts++;
-    if (checkForToken() || attempts > 30) {
-      clearInterval(interval);
+  const timer = setInterval(() => {
+    if (++attempts > 60) {
+      clearInterval(timer);
+      return;
     }
-  }, 500);
+    const raw = sessionStorage.getItem("wantio_ext_token");
+    if (!raw) return;
+    let session;
+    try {
+      session = JSON.parse(raw);
+    } catch {
+      return;
+    }
+    clearInterval(timer);
+    chrome.runtime.sendMessage({ type: "AUTH_TOKEN", ...session }, (reply) => {
+      if (reply?.ok) {
+        sessionStorage.removeItem("wantio_ext_token");
+        window.postMessage(
+          { type: "WANTIO_EXTENSION_CONNECTED" },
+          window.location.origin,
+        );
+      }
+    });
+  }, 250);
 })();

@@ -1,138 +1,54 @@
 "use client";
-
-import { DollarSign, Package, TrendingDown } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ImageWithFallback } from "@/components/image-with-fallback";
-import { getCurrencySymbol } from "@/lib/utils";
 import { WishlistItem } from "@/types";
-
-interface PurchasedViewProps {
+import { groupPurchases, formatMoney } from "@/lib/price";
+import { ProductCard } from "./product-card";
+export function PurchasedView({
+  items,
+  onOpen,
+}: {
   items: WishlistItem[];
-}
-
-export function PurchasedView({ items }: PurchasedViewProps) {
-  const totalSpent = items.reduce(
-    (sum, item) => sum + (item.purchased_price ?? item.current_price ?? 0),
-    0
-  );
-  const totalSaved = items.reduce((sum, item) => {
-    const original = item.original_price ?? 0;
-    const paid = item.purchased_price ?? item.current_price ?? 0;
-    return sum + Math.max(0, original - paid);
-  }, 0);
-
+  onOpen: (item: WishlistItem) => void;
+}) {
+  const groups = groupPurchases(items);
   return (
-    <div className="space-y-6">
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-        <Card className="p-4 border-border/50">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary/10">
-              <DollarSign className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Total Spent</p>
-              <p className="text-lg font-semibold">${totalSpent.toFixed(2)}</p>
-            </div>
-          </div>
-        </Card>
-        <Card className="p-4 border-border/50">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center h-10 w-10 rounded-full bg-green-500/10">
-              <TrendingDown className="h-5 w-5 text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Total Saved</p>
-              <p className="text-lg font-semibold text-green-600 dark:text-green-400">
-                ${totalSaved.toFixed(2)}
+    <section className="space-y-5">
+      <h1 className="text-xl font-semibold">
+        Purchased{" "}
+        <span className="text-sm text-muted-foreground">{items.length}</span>
+      </h1>
+      <div className="flex flex-wrap gap-3">
+        {Object.entries(groups).map(([currency, v]) => (
+          <div key={currency} className="rounded-xl border p-4 bg-card">
+            <p className="text-xs text-muted-foreground">Spent · {currency}</p>
+            <p className="text-xl font-semibold tabular-nums">
+              {formatMoney(v.spent, currency)}
+            </p>
+            {v.saved > 0 && (
+              <p className="text-sm text-muted-foreground">
+                Saved {formatMoney(v.saved, currency)}
               </p>
-            </div>
+            )}
           </div>
-        </Card>
-        <Card className="p-4 border-border/50 col-span-2 md:col-span-1">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center h-10 w-10 rounded-full bg-blue-500/10">
-              <Package className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">Items Bought</p>
-              <p className="text-lg font-semibold">{items.length}</p>
-            </div>
-          </div>
-        </Card>
+        ))}
       </div>
-
-      {/* Purchased items grid */}
-      {items.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground">
-          <Package className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No purchased items yet.</p>
-          <p className="text-xs mt-1">
-            Items you mark as purchased will appear here.
-          </p>
-        </div>
+      {!items.length ? (
+        <p className="py-16 text-center text-muted-foreground">
+          Your purchases will appear here.
+        </p>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {items.map((item) => {
-            const currSymbol = getCurrencySymbol(item.currency);
-            return (
-              <Card
-                key={item.id}
-                className="overflow-hidden border-border/50 opacity-90"
-              >
-                <div className="relative aspect-square overflow-hidden bg-muted">
-                  <ImageWithFallback
-                    src={item.image_url}
-                    alt={item.name}
-                    className="h-full w-full object-cover grayscale-[30%]"
-                    fallbackClassName="aspect-square w-full"
-                  />
-                  <div className="absolute top-2 right-2">
-                    <Badge className="bg-green-600 text-white text-[10px]">
-                      Purchased
-                    </Badge>
-                  </div>
-                </div>
-                <div className="p-3 space-y-1.5">
-                  <h3 className="font-medium text-sm leading-tight line-clamp-2">
-                    {item.name}
-                  </h3>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="font-semibold text-sm">
-                      {currSymbol}
-                      {(
-                        item.purchased_price ??
-                        item.current_price ??
-                        0
-                      ).toFixed(2)}
-                    </span>
-                    {item.original_price != null &&
-                      item.purchased_price != null &&
-                      item.original_price > item.purchased_price && (
-                        <span className="text-xs text-green-600 dark:text-green-400">
-                          saved {currSymbol}
-                          {(item.original_price - item.purchased_price).toFixed(
-                            2
-                          )}
-                        </span>
-                      )}
-                  </div>
-                  {item.purchased_at && (
-                    <p className="text-[11px] text-muted-foreground">
-                      {new Date(item.purchased_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </p>
-                  )}
-                </div>
-              </Card>
-            );
-          })}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {items.map((i) => (
+            <ProductCard
+              key={i.id}
+              item={{
+                ...i,
+                current_price: i.purchased_price ?? i.current_price,
+              }}
+              onTap={() => onOpen(i)}
+            />
+          ))}
         </div>
       )}
-    </div>
+    </section>
   );
 }

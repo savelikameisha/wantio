@@ -1,145 +1,94 @@
-import { Heart } from "lucide-react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { getCurrencySymbol } from "@/lib/utils";
-
+import { z } from "zod";
+import { notFound } from "next/navigation";
+import { formatMoney } from "@/lib/price";
+import { ImageWithFallback } from "@/components/image-with-fallback";
+const sharedSchema = z.object({
+  display_name: z.string().nullable(),
+  items: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      url: z.string().nullable(),
+      image_url: z.string().nullable(),
+      current_price: z.number().nullable(),
+      currency: z.string(),
+      store: z.string().nullable(),
+      tags: z.array(
+        z.object({ id: z.string(), name: z.string(), color: z.string() }),
+      ),
+    }),
+  ),
+});
 export default async function SharedWishlistPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const supabase = createClient();
-
-  // Find the user profile by public share ID
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, display_name, public_share_enabled")
-    .eq("public_share_id", params.id)
-    .single();
-
-  if (!profile || !profile.public_share_enabled) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center text-muted-foreground">
-          <Heart className="h-12 w-12 mx-auto mb-3 opacity-30" />
-          <p className="text-sm font-medium">Wishlist not found</p>
-          <p className="text-xs mt-1">
-            This wishlist doesn&apos;t exist or is no longer shared.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // Fetch active wishlist items
-  const { data: items } = await supabase
-    .from("wishlist_items")
-    .select(
-      `
-      *,
-      item_tags(tags(*))
-    `
-    )
-    .eq("user_id", profile.id)
-    .eq("is_purchased", false)
-    .order("created_at", { ascending: false });
-
-  const wishlistItems = items ?? [];
-
+  const { id } = await params;
+  if (!z.uuid().safeParse(id).success) notFound();
+  const client = await createClient();
+  const { data, error } = await client.rpc("get_shared_wishlist", {
+    p_share_id: id,
+  });
+  if (error) throw new Error("Could not load this wishlist. Try again.");
+  if (!data) notFound();
+  const profile = sharedSchema.parse(data);
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border/50">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-2">
-          <Heart className="h-5 w-5 text-muted-foreground" />
-          <h1 className="text-lg font-semibold tracking-tight">
-            {profile.display_name
-              ? `${profile.display_name}'s Wishlist`
-              : "Shared Wishlist"}
-          </h1>
+      <header className="border-b">
+        <div className="max-w-5xl mx-auto px-4 py-5">
+          <Link href="/" className="font-semibold">
+            Wantio
+          </Link>
         </div>
       </header>
-
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        {wishlistItems.length === 0 ? (
-          <div className="text-center py-16 text-muted-foreground">
-            <Heart className="h-12 w-12 mx-auto mb-3 opacity-30" />
-            <p className="text-sm">This wishlist is empty.</p>
-          </div>
+      <main className="max-w-5xl mx-auto px-4 py-8">
+        <h1 className="text-2xl font-semibold mb-2">
+          {profile.display_name
+            ? `${profile.display_name}'s wishlist`
+            : "Shared wishlist"}
+        </h1>
+        <p className="text-muted-foreground mb-8">
+          A few things they would love.
+        </p>
+        {!profile.items.length ? (
+          <p>No items to share yet.</p>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            {wishlistItems.map((item) => {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const tags = (item.item_tags ?? []).map((it: any) => it.tags).filter(Boolean);
-              const currentPrice = item.current_price ? Number(item.current_price) : null;
-              const originalPrice = item.original_price ? Number(item.original_price) : null;
-              const currSymbol = getCurrencySymbol(item.currency);
-
-              return (
-                <Card
-                  key={item.id}
-                  className="overflow-hidden border-border/50"
-                >
-                  <div className="relative aspect-square overflow-hidden bg-muted">
-                    {item.image_url ? (
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-muted-foreground text-sm">
-                        No image
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-3 space-y-2">
-                    <h3 className="font-medium text-sm leading-tight line-clamp-2">
-                      {item.name}
-                    </h3>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-baseline gap-1.5">
-                        {currentPrice != null && (
-                          <span className="font-semibold text-base">
-                            {currSymbol}{currentPrice.toFixed(2)}
-                          </span>
-                        )}
-                        {originalPrice != null &&
-                          currentPrice != null &&
-                          originalPrice !== currentPrice && (
-                            <span className="text-xs text-muted-foreground line-through">
-                              {currSymbol}{originalPrice.toFixed(2)}
-                            </span>
-                          )}
-                      </div>
-                      {item.store && (
-                        <span className="text-xs text-muted-foreground">
-                          {item.store}
-                        </span>
-                      )}
-                    </div>
-                    {tags.length > 0 && (
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {tags.map((tag: { id: string; name: string; color: string }) => (
-                          <Badge
-                            key={tag.id}
-                            variant="secondary"
-                            className="text-[10px] px-1.5 py-0"
-                            style={{
-                              backgroundColor: `${tag.color}15`,
-                              color: tag.color,
-                              borderColor: `${tag.color}30`,
-                            }}
-                          >
-                            {tag.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              );
-            })}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {profile.items.map((i) => (
+              <article
+                key={i.id}
+                className="rounded-xl border overflow-hidden bg-card"
+              >
+                <ImageWithFallback src={i.image_url} alt={i.name} />
+                <div className="p-4 space-y-2">
+                  <h2 className="font-medium">{i.name}</h2>
+                  {i.current_price != null && (
+                    <p className="tabular-nums">
+                      {formatMoney(i.current_price, i.currency)}
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground">{i.store}</p>
+                  {!!i.tags.length && (
+                    <p className="text-xs text-muted-foreground">
+                      {i.tags.map((t) => t.name).join(" · ")}
+                    </p>
+                  )}
+                  {i.url && /^https?:\/\//i.test(i.url) && (
+                    <a
+                      href={i.url}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                      className="inline-flex items-center min-h-11 text-sm font-medium underline underline-offset-4"
+                    >
+                      Open store
+                    </a>
+                  )}
+                </div>
+              </article>
+            ))}
           </div>
         )}
       </main>

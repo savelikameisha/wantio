@@ -11,10 +11,19 @@ export function ThemeToggle() {
 
   useEffect(() => setMounted(true), []);
 
-  if (!mounted) return <Button variant="ghost" size="icon" className="h-9 w-9" />;
+  if (!mounted)
+    return (
+      <Button
+        aria-label="Toggle color theme"
+        variant="ghost"
+        size="icon"
+        className="h-9 w-9"
+      />
+    );
 
   return (
     <Button
+      aria-label="Toggle color theme"
       variant="ghost"
       size="icon"
       className="h-9 w-9"

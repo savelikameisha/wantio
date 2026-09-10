@@ -1,130 +1,95 @@
-// Wantry Chrome Extension — Background Service Worker
-// Handles auth session management
-
-const DEFAULT_WANTRY_URL = "https://wantry.vercel.app";
-const TOKEN_KEY = "wantry_session";
-
-// Get the configured Wantry app URL
-async function getWantryUrl() {
-  const result = await chrome.storage.local.get("wantryUrl");
-  return result.wantryUrl || DEFAULT_WANTRY_URL;
+// Wantio: session refresh lives in the worker, not in short-lived popups.
+const WANTIO_URL = "https://wantio-saveli-desings.vercel.app";
+const TOKEN_KEY = "wantio_session";
+let refreshing = null;
+let config = null;
+async function getConfig() {
+  if (config) return config;
+  const res = await fetch(`${WANTIO_URL}/api/config`);
+  if (!res.ok) throw new Error("Wantio is unavailable. Try again.");
+  config = await res.json();
+  return config;
 }
-
-// Get stored session from chrome.storage
-async function getSession() {
-  const result = await chrome.storage.local.get(TOKEN_KEY);
-  const session = result[TOKEN_KEY];
-
-  if (!session?.access_token) return null;
-
-  // Check if token might be expired (stored_at + expires_in)
-  if (session.stored_at && session.expires_in) {
-    const expiresAt = session.stored_at + session.expires_in * 1000;
-    if (Date.now() > expiresAt - 60000) {
-      // Token expired or about to expire — try refresh
-      const refreshed = await refreshSession(session.refresh_token);
-      if (refreshed) return refreshed;
-      // Refresh failed — clear and return null
-      await chrome.storage.local.remove(TOKEN_KEY);
-      return null;
-    }
+function expiry(token) {
+  try {
+    return JSON.parse(
+      atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")),
+    ).exp;
+  } catch {
+    return 0;
   }
-
+}
+async function storeSession(data) {
+  if (!data.access_token || !data.refresh_token)
+    throw new Error("Invalid session.");
+  const session = {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_at: data.expires_at || expiry(data.access_token),
+  };
+  await chrome.storage.local.set({ [TOKEN_KEY]: session });
   return session;
 }
-
-// Store session
-async function storeSession(data) {
-  await chrome.storage.local.set({
-    [TOKEN_KEY]: {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      user: data.user,
-      expires_in: data.expires_in || 3600,
-      stored_at: Date.now(),
-    },
-  });
-}
-
-// Refresh an expired token via Supabase REST API
-async function refreshSession(refreshToken) {
-  if (!refreshToken) return null;
-
-  try {
-    const SUPABASE_URL = "https://fxjzqbdlroeeifqzfhbl.supabase.co";
-    const SUPABASE_ANON_KEY =
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4anpxYmRscm9lZWlmcXpmaGJsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEzMzYwODgsImV4cCI6MjA4NjkxMjA4OH0.jVUiW5GMgqDx2n-WkCpjgAHhWgpnphC2RZi7m1eFKDQ";
-
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+async function refresh(session) {
+  const c = await getConfig();
+  const res = await fetch(
+    `${c.supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
+    {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        apikey: SUPABASE_ANON_KEY,
+        apikey: c.supabaseAnonKey,
       },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-    });
-
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    if (data.access_token) {
-      const session = {
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        user: data.user,
-        expires_in: data.expires_in || 3600,
-        stored_at: Date.now(),
-      };
-      await chrome.storage.local.set({ [TOKEN_KEY]: session });
-      return session;
-    }
-    return null;
-  } catch {
-    return null;
+      body: JSON.stringify({ refresh_token: session.refresh_token }),
+    },
+  );
+  if (!res.ok) {
+    if (res.status === 400 || res.status === 401)
+      await chrome.storage.local.remove(TOKEN_KEY);
+    throw new Error("Sign in to Wantio again.");
   }
+  return storeSession(await res.json());
 }
-
-// Listen for messages from popup and content scripts
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message.type === "GET_SESSION") {
-    getSession().then(sendResponse);
-    return true;
+async function getSession(force = false) {
+  const stored = await chrome.storage.local.get(TOKEN_KEY);
+  const session = stored[TOKEN_KEY];
+  if (!session) return null;
+  if (
+    force ||
+    !session.expires_at ||
+    Date.now() / 1000 >= session.expires_at - 60
+  ) {
+    if (!refreshing)
+      refreshing = refresh(session).finally(() => {
+        refreshing = null;
+      });
+    return refreshing;
   }
-
-  if (message.type === "GET_WANTRY_URL") {
-    getWantryUrl().then((url) => sendResponse({ url }));
-    return true;
-  }
-
-  if (message.type === "SET_WANTRY_URL") {
-    chrome.storage.local.set({ wantryUrl: message.url }).then(() => {
-      sendResponse({ ok: true });
-    });
-    return true;
-  }
-
-  // Receive token from auth page content script
-  if (message.type === "AUTH_TOKEN") {
-    storeSession(message).then(() => {
-      sendResponse({ ok: true });
-    });
-    return true;
-  }
-
-  if (message.type === "LOGOUT") {
-    chrome.storage.local.remove(TOKEN_KEY).then(() => {
-      sendResponse({ ok: true });
-    });
-    return true;
-  }
-});
-
-// Listen for external messages (from the web page via chrome.runtime.sendMessage)
-chrome.runtime.onMessageExternal.addListener((message, _sender, sendResponse) => {
-  if (message.type === "AUTH_TOKEN" && message.access_token) {
-    storeSession(message).then(() => {
-      sendResponse({ ok: true });
-    });
-    return true;
-  }
+  return session;
+}
+chrome.runtime.onMessage.addListener((message, sender, reply) => {
+  const task = async () => {
+    if (message.type === "GET_SESSION")
+      return getSession(message.force === true);
+    if (message.type === "GET_CONFIG")
+      return { ...(await getConfig()), url: WANTIO_URL };
+    if (message.type === "AUTH_TOKEN") {
+      if (
+        !sender.tab?.url ||
+        !sender.tab.url.startsWith(`${WANTIO_URL}/auth/extension`)
+      )
+        throw new Error("Unexpected sign-in page.");
+      await storeSession(message);
+      return { ok: true };
+    }
+    if (message.type === "LOGOUT") {
+      await chrome.storage.local.remove(TOKEN_KEY);
+      return { ok: true };
+    }
+    throw new Error("Unknown request.");
+  };
+  task()
+    .then(reply)
+    .catch((error) => reply({ error: error.message }));
+  return true;
 });

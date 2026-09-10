@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
-import { Sora } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
-const sora = Sora({
-  subsets: ["latin"],
-  variable: "--font-sora",
-  weight: ["300", "400", "500", "600", "700"],
+const sora = localFont({
+  src: "./fonts/GeistVF.woff",
+  variable: "--font-wantio",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Wantry",
+  title: "Wantio",
   description:
-    "Track your wishlists, monitor price changes, and never miss a deal.",
+    "Save the things you love. Organize your wishlist and share it with friends.",
   icons: {
     icon: "/icon.svg",
   },
@@ -26,7 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${sora.variable} font-[family-name:var(--font-sora)] antialiased`}
+        className={`${sora.variable} font-[family-name:var(--font-wantio)] antialiased`}
       >
         <ThemeProvider
           attribute="class"

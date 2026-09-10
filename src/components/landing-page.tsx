@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ShoppingBag, Tags, Share2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -10,16 +11,14 @@ export function LandingPage() {
       {/* Header */}
       <header className="w-full px-4 py-4 flex items-center justify-between max-w-5xl mx-auto">
         <div className="flex items-center gap-2">
-          <img src="/icon.svg" alt="Wantry" className="h-8 w-8" />
-          <span className="text-base font-semibold tracking-tight">Wantry</span>
+          <img src="/icon.svg" alt="Wantio" className="h-8 w-8" />
+          <span className="text-base font-semibold tracking-tight">Wantio</span>
         </div>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <a href="/login">
-            <Button variant="outline" size="sm">
-              Sign In
-            </Button>
-          </a>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/login">Sign in</Link>
+          </Button>
         </div>
       </header>
 
@@ -29,19 +28,25 @@ export function LandingPage() {
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-tight">
             Your wishlist,
             <br />
-            <span className="text-muted-foreground">beautifully organized.</span>
+            <span className="text-muted-foreground">
+              beautifully organized.
+            </span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-md mx-auto">
-            Save products from any store, track prices, and organize everything
-            with tags. Simple, fast, and private.
+            Save products from your favorite stores, record prices, and organize
+            everything with tags. Simple, fast, and private.
           </p>
           <div className="flex justify-center pt-2">
-            <a href="/login">
-              <Button size="lg" className="text-base px-8 h-12 rounded-full">
-                Get Started
+            <Button
+              asChild
+              size="lg"
+              className="text-base px-8 h-12 rounded-full"
+            >
+              <Link href="/login">
+                Get started
                 <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </a>
+              </Link>
+            </Button>
           </div>
         </div>
 
@@ -53,8 +58,8 @@ export function LandingPage() {
             </div>
             <h3 className="font-semibold text-sm">Paste & Save</h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Paste any product URL and we&apos;ll extract the name, price, image,
-              and store automatically.
+              Fill in product details from a link, then check and save. You can
+              always enter them yourself.
             </p>
           </div>
           <div className="rounded-2xl border border-border/50 p-6 space-y-3 bg-card">

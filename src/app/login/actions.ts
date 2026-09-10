@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
 export async function loginWithGoogle() {
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
@@ -14,7 +14,7 @@ export async function loginWithGoogle() {
   });
 
   if (error) {
-    throw new Error("Authentication failed");
+    redirect("/login?error=authentication_failed");
   }
 
   if (data.url) {

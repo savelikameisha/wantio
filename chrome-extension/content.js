@@ -1,17 +1,17 @@
-// Wantry Chrome Extension — Content Script
+// Wantio Chrome Extension — Content Script
 // Extracts product data from the current page (runs in page context)
 
 (function () {
   function getMetaContent(property) {
     const el = document.querySelector(
-      `meta[property="${property}"], meta[name="${property}"]`
+      `meta[property="${property}"], meta[name="${property}"]`,
     );
     return el ? el.getAttribute("content") : null;
   }
 
   function extractJsonLd() {
     const scripts = document.querySelectorAll(
-      'script[type="application/ld+json"]'
+      'script[type="application/ld+json"]',
     );
     for (const script of scripts) {
       try {
@@ -64,12 +64,8 @@
       const el = document.querySelector(sel);
       if (el) {
         const text = el.getAttribute("data-price") || el.textContent;
-        const cleaned = text
-          .replace(/[^0-9.,]/g, "")
-          .replace(/,(\d{2})$/, ".$1")
-          .replace(/,/g, "");
-        const num = parseFloat(cleaned);
-        if (!isNaN(num) && num > 0) return Math.round(num * 100) / 100;
+        const num = globalThis.wantioParsePrice(text);
+        if (num !== null) return num;
       }
     }
     return null;
@@ -83,6 +79,7 @@
 
     const hostname = window.location.hostname;
     const domainCurrencies = {
+      ".pl": "PLN",
       ".co.uk": "GBP",
       ".de": "EUR",
       ".fr": "EUR",
@@ -126,7 +123,7 @@
     const hostname = window.location.hostname.replace(/^www\./, "");
     if (STORE_NAMES[hostname]) return STORE_NAMES[hostname];
     for (const [domain, name] of Object.entries(STORE_NAMES)) {
-      if (hostname.endsWith(domain)) return name;
+      if (hostname === domain || hostname.endsWith("." + domain)) return name;
     }
     // Fallback: capitalize the domain name
     const parts = hostname.split(".");
@@ -148,7 +145,7 @@
       getMetaContent("twitter:title") ||
       document.title ||
       null,
-    price: jsonLd.price ? parseFloat(String(jsonLd.price)) : extractPrice(),
+    price: globalThis.wantioParsePrice(jsonLd.price) ?? extractPrice(),
     image_url:
       jsonLd.image ||
       getMetaContent("og:image") ||
@@ -166,6 +163,8 @@
   }
 
   // Make relative image URLs absolute
+  if (typeof result.image_url !== "string")
+    result.image_url = result.image_url?.url || null;
   if (result.image_url && !result.image_url.startsWith("http")) {
     try {
       result.image_url = new URL(result.image_url, window.location.href).href;

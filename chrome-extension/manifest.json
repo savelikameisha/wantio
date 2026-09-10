@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "Wantry — Add to Wishlist",
-  "short_name": "Wantry",
-  "version": "1.0.0",
-  "description": "Quickly add products from any page to your Wantry wishlist with AI-powered extraction.",
+  "name": "Wantio \u2014 Add to Wishlist",
+  "short_name": "Wantio",
+  "version": "2.0.0",
+  "description": "Save products to your Wantio wishlist from the current page.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -16,35 +16,21 @@
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png"
     },
-    "default_title": "Add to Wantry"
+    "default_title": "Add to Wantio"
   },
-  "permissions": [
-    "activeTab",
-    "scripting",
-    "storage"
-  ],
+  "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": [
-    "https://wantry.vercel.app/*",
-    "http://localhost:3000/*",
-    "https://*.supabase.co/*"
+    "https://wantio-saveli-desings.vercel.app/*",
+    "https://zfrdcuztrujsmrsnppes.supabase.co/*"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://wantry.vercel.app/auth/extension*",
-        "http://localhost:3000/auth/extension*"
-      ],
+      "matches": ["https://wantio-saveli-desings.vercel.app/auth/extension*"],
       "js": ["auth-content.js"],
       "run_at": "document_idle"
     }
-  ],
-  "externally_connectable": {
-    "matches": [
-      "https://wantry.vercel.app/*",
-      "http://localhost:3000/*"
-    ]
-  }
+  ]
 }

@@ -5,6 +5,7 @@ export interface Tag {
 }
 
 export interface PricePoint {
+  currency?: string;
   price: number;
   recorded_at: string;
 }
@@ -18,6 +19,7 @@ export interface WishlistItem {
   original_price?: number;
   store?: string;
   currency?: string;
+  is_archived?: boolean;
   is_purchased: boolean;
   purchased_at?: string;
   purchased_price?: number;

@@ -1,57 +1,44 @@
 "use client";
-
 import { useState } from "react";
 import { ImageOff } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-interface ImageWithFallbackProps {
-  src?: string | null;
-  alt: string;
-  className?: string;
-  fallbackClassName?: string;
-}
-
 export function ImageWithFallback({
   src,
   alt,
   className,
   fallbackClassName,
-}: ImageWithFallbackProps) {
-  const [hasError, setHasError] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  if (!src || hasError) {
-    return (
-      <div
-        className={cn(
-          "flex items-center justify-center bg-muted",
-          fallbackClassName
-        )}
-      >
-        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-          <ImageOff className="h-8 w-8 opacity-40" />
-          <span className="text-xs opacity-60">No image</span>
-        </div>
-      </div>
-    );
-  }
-
+}: {
+  src?: string | null;
+  alt: string;
+  className?: string;
+  fallbackClassName?: string;
+}) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const valid = src && /^https?:\/\//i.test(src) && failed !== src;
   return (
-    <>
-      {isLoading && (
-        <div className={cn("animate-pulse bg-muted", fallbackClassName)} />
+    <div
+      className={cn(
+        "relative aspect-square overflow-hidden bg-muted/40",
+        fallbackClassName,
       )}
-      <img
-        src={src}
-        alt={alt}
-        className={cn(className, isLoading && "hidden")}
-        loading="lazy"
-        onLoad={() => setIsLoading(false)}
-        onError={() => {
-          setHasError(true);
-          setIsLoading(false);
-        }}
-      />
-    </>
+    >
+      {valid ? (
+        <img
+          src={src}
+          alt={alt}
+          className={cn(
+            "absolute inset-0 h-full w-full object-contain",
+            className,
+          )}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(src)}
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+          <ImageOff className="h-8 w-8" aria-label={alt || "No image"} />
+        </div>
+      )}
+    </div>
   );
 }
