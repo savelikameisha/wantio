@@ -226,7 +226,7 @@ button:active {
 .hero > img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
 }
 .image-placeholder {
   color: #999;
@@ -367,13 +367,6 @@ button:active {
   color: #111;
   text-decoration: underline;
   text-underline-offset: 3px;
-}
-#add-note {
-  display: block;
-  margin: 0 auto;
-}
-#note-section {
-  margin: 12px 0;
 }
 input,
 select,
@@ -538,7 +531,7 @@ dialog::backdrop {
 .image-option img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
 }
 .image-link-row {
   display: flex;
@@ -569,4 +562,97 @@ dialog::backdrop {
   .text-button {
     min-height: 44px;
   }
+}
+
+.labels-block {
+  margin: 0 0 18px;
+  text-align: center;
+}
+#labels-toggle {
+  border: 1px dashed #c9c9c9;
+  border-radius: 9px;
+  min-height: 40px;
+  max-width: 100%;
+  padding: 9px 14px;
+  font-size: 13px;
+  color: #666;
+  overflow-wrap: anywhere;
+}
+#labels-toggle:hover {
+  background: var(--surface);
+}
+.labels-panel {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  text-align: left;
+  box-shadow: 0 4px 16px #00000008;
+}
+.label-options {
+  max-height: 160px;
+  overflow-y: auto;
+  margin-top: 6px;
+}
+.label-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px;
+  margin: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--ink);
+}
+.label-option:hover {
+  background: var(--surface);
+}
+.label-option input {
+  width: 16px;
+  height: 16px;
+  min-height: 0;
+  margin: 0;
+  accent-color: var(--ink);
+}
+.label-create {
+  min-height: 44px;
+  padding: 8px;
+  width: 100%;
+  text-align: left;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+#labels-empty:empty,
+#draft-status:empty {
+  display: none;
+}
+#labels-empty {
+  margin-top: 12px;
+}
+#note-input {
+  margin-bottom: 12px;
+}
+.save-footer .primary {
+  justify-content: center;
+}
+
+.labels-block {
+  position: relative;
+}
+.labels-panel {
+  position: absolute;
+  z-index: 4;
+  bottom: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  max-height: 310px;
+  overflow-y: auto;
+  margin-top: 0;
+  background: #fff;
+  box-shadow: 0 8px 28px #00000016;
+}
+.label-options {
+  max-height: 128px;
 }

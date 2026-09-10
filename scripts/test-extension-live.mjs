@@ -138,11 +138,33 @@ try {
   await popup
     .getByRole("button", { name: "Choose image 1", exact: true })
     .click();
-  await popup.locator("#add-note").click();
-  await popup.locator("#note-input").fill("For the reading corner.");
-  await expect(popup.locator("#draft-status")).toHaveText(
-    "Draft kept on this device.",
+  await expect(popup.locator("#save")).toHaveText("Save to wishlist");
+  await expect(popup.locator("#draft-status")).toBeHidden();
+  await expect(popup.locator("#note-input")).toBeHidden();
+  await expect(popup.locator("#product-image")).toHaveCSS(
+    "object-fit",
+    "cover",
   );
+  await popup.locator("#labels-toggle").click();
+  await popup.locator("#label-search").fill("Reading corner");
+  await popup.locator("#label-search").press("Enter");
+  await expect(
+    popup.getByRole("checkbox", { name: "Reading corner", exact: true }),
+  ).toBeChecked();
+  await popup.screenshot({ path: "test-results/extension/labels.png" });
+  await popup
+    .getByRole("checkbox", { name: "Reading corner", exact: true })
+    .uncheck();
+  await popup
+    .getByRole("checkbox", { name: "Reading corner", exact: true })
+    .check();
+  await popup.locator("#label-search").fill("reading CORNER");
+  await expect(popup.locator("#create-label")).toBeHidden();
+  await popup.locator("#label-search").press("Escape");
+  await expect(popup.locator("#labels-panel")).toBeHidden();
+  await expect(popup.locator("#labels-toggle")).toHaveText("@Reading corner");
+  await popup.locator("#details summary").click();
+  await popup.locator("#note-input").fill("For the reading corner.");
   await expect
     .poll(async () => {
       const stored = await worker.evaluate(() =>
@@ -194,6 +216,21 @@ try {
       notes: "For the reading corner.",
     },
   ]);
+  const { data: labels, error: labelError } = await admin
+    .from("tags")
+    .select("id,name")
+    .eq("user_id", user.id);
+  if (labelError) throw labelError;
+  expect(labels).toHaveLength(1);
+  expect(labels[0].name).toBe("Reading corner");
+  const { data: links } = await admin
+    .from("item_tags")
+    .select("tag_id")
+    .eq("tag_id", labels[0].id);
+  expect(links).toHaveLength(1);
+  console.log(
+    "Created label belongs to the account and is attached to the saved item",
+  );
   console.log("Saved exactly one item with edited fields");
   await reopened.reload();
   await expect(reopened.locator("#state-success")).toBeVisible();

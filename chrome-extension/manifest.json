@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Wantio \u2014 Add to Wishlist",
   "short_name": "Wantio",
-  "version": "2.2.0",
+  "version": "2.0.0",
   "description": "Save products to your Wantio wishlist from the current page.",
   "icons": {
     "16": "icons/icon-16.png",

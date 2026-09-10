@@ -1,4 +1,4 @@
-# Wantio 2.2.0 — existing listing update
+# Wantio 2.0.0 — existing listing update
 
 Extension ID: `imblfhjhilgcemgfodeoiolcdibhceah`  
 Existing listing: https://chromewebstore.google.com/detail/wantio/imblfhjhilgcemgfodeoiolcdibhceah  
@@ -18,7 +18,7 @@ Save products from the page you are browsing to your Wantio wishlist. Click Want
 
 • Choose a product photo from the page or paste an image link.
 • Edit the name and price right in the preview.
-• Organize finds with your existing tags and add private notes.
+• Choose or create labels and add private notes in More details.
 • Pick up where you left off with drafts kept on your device.
 • Open your wishlist at wantio.app whenever you need it.
 
@@ -50,7 +50,7 @@ Allow users to save and organize products from the current page in their persona
 - `scripting`: run bundled product metadata extraction on that page after the user invokes the extension.
 - `storage`: keep account connection tokens and recent drafts/save confirmations locally.
 - `https://wantio.app/*`: retrieve public connection settings, connect the account on `/auth/extension`, and save or explicitly look up product details through the Wantio API.
-- `https://zfrdcuztrujsmrsnppes.supabase.co/*`: refresh authentication and retrieve the signed-in user's tags.
+- `https://zfrdcuztrujsmrsnppes.supabase.co/*`: refresh authentication and retrieve and create the signed-in user's labels.
 
 No history permission, persistent access to all shopping sites, remotely hosted code, advertising, or analytics SDK. All extension executable code is in the ZIP.
 
@@ -65,12 +65,12 @@ Use is limited to the extension's single purpose. Data is not sold or used for a
 1. Install the uploaded package in Chrome.
 2. Click Wantio and select Connect to Wantio. Sign in with a Google account on wantio.app in the same Chrome profile. No paid subscription is required.
 3. Wait for the connected confirmation, open a public product page, and click Wantio.
-4. Click the product name or price to edit. Click the image to choose another or provide a public image URL. Existing tags appear if the account has tags.
+4. Click the product name or price to edit. Click the image to choose another or provide a public image URL. Use @label to choose an existing label or create one.
 5. Save to wishlist, then open wantio.app to see the item. Delete the test item when finished.
 6. Drafts can be verified by editing the product name, closing the popup, and reopening it on the same page.
 
 ## Upload steps
 
-Open the developer dashboard → existing Wantio item → Package → Upload new package. Upload `wantio-extension-2.2.0.zip`, update listing artwork/text and privacy disclosures, verify the privacy/support links, and submit for review. Do not change the item ID. Installed Store copies receive the update through Chrome once the update is approved and published.
+Open the developer dashboard → existing Wantio item → Package → Upload new package. Upload `wantio-extension-2.0.0.zip`, update listing artwork/text and privacy disclosures, verify the privacy/support links, and submit for review. Do not change the item ID. Installed Store copies receive the update through Chrome once the update is approved and published.
 
 The public manual download and the Store publication are separate. Uploading/preparing this bundle does not mean Google has approved or published it.

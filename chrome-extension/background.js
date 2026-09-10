@@ -65,6 +65,47 @@ async function handle(message, sender) {
         {},
         true,
       );
+    case "CREATE_TAG": {
+      const name = typeof message.name === "string" ? message.name.trim() : "";
+      if (!name || name.length > 40)
+        throw new ExtensionError(
+          "Use a label name up to 40 characters.",
+          "validation",
+        );
+      const session = await sessions.get();
+      if (!session)
+        throw new ExtensionError("Connect your account to continue.", "auth");
+      const userId = JSON.parse(
+        atob(
+          session.access_token
+            .split(".")[1]
+            .replace(/-/g, "+")
+            .replace(/_/g, "/"),
+        ),
+      ).sub;
+      const existing = await authorized(
+        "/rest/v1/tags?select=id,name,color&order=name",
+        {},
+        true,
+      );
+      const match = existing.find(
+        (tag) => tag.name.toLowerCase() === name.toLowerCase(),
+      );
+      if (match) return match;
+      const result = await authorized(
+        "/rest/v1/tags?on_conflict=user_id,name&select=id,name,color",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Prefer: "return=representation,resolution=merge-duplicates",
+          },
+          body: JSON.stringify({ name, user_id: userId, color: "#65b5f6" }),
+        },
+        true,
+      );
+      return result[0];
+    }
     case "GET_DRAFT":
       return drafts.get(await draftKey(message.url));
     case "SAVE_DRAFT":

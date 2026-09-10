@@ -5,7 +5,7 @@ test("extension help, privacy and sign-in work on mobile without an account", as
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/extension");
   await expect(
-    page.getByRole("heading", { name: "Try version 2.2.0" }),
+    page.getByRole("heading", { name: "Try version 2.0.0" }),
   ).toBeVisible();
   await page.getByRole("link", { name: "Privacy", exact: true }).click();
   await expect(

@@ -37,26 +37,111 @@ function renderPrice() {
   $("price-input").value = item.current_price ?? "";
   $("currency-input").value = item.currency;
 }
+let creatingLabel = false;
 function renderTags() {
-  $("tag-section").hidden = !tags.length;
+  const selected = tags.filter((tag) => item.tagIds.includes(tag.id));
+  $("labels-toggle").textContent = selected.length
+    ? selected.map((tag) => `@${tag.name}`).join(" · ")
+    : "@label";
+  const query = $("label-search").value.trim().toLowerCase();
   const container = $("tags");
   container.replaceChildren();
-  for (const tag of tags) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "tag";
-    button.textContent = tag.name;
-    button.setAttribute("aria-pressed", String(item.tagIds.includes(tag.id)));
-    button.addEventListener("click", () => {
-      item.tagIds = item.tagIds.includes(tag.id)
-        ? item.tagIds.filter((id) => id !== tag.id)
-        : [...item.tagIds, tag.id];
-      renderTags();
+  const matches = tags.filter((tag) => tag.name.toLowerCase().includes(query));
+  for (const tag of matches) {
+    const label = document.createElement("label");
+    label.className = "label-option";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = item.tagIds.includes(tag.id);
+    input.addEventListener("change", () => {
+      if (input.checked && item.tagIds.length >= 30) {
+        input.checked = false;
+        $("labels-error").textContent = "Choose up to 30 labels.";
+        return;
+      }
+      item.tagIds = input.checked
+        ? [...item.tagIds, tag.id]
+        : item.tagIds.filter((id) => id !== tag.id);
+      $("labels-error").textContent = "";
       persist();
+      $("labels-toggle").textContent =
+        tags
+          .filter((t) => item.tagIds.includes(t.id))
+          .map((t) => `@${t.name}`)
+          .join(" · ") || "@label";
     });
-    container.append(button);
+    const text = document.createElement("span");
+    text.textContent = tag.name;
+    label.append(input, text);
+    container.append(label);
   }
+  $("labels-empty").textContent = matches.length
+    ? ""
+    : query
+      ? "No matching labels."
+      : "Create your first label below.";
+  $("create-label").hidden =
+    !query || tags.some((tag) => tag.name.toLowerCase() === query);
+  $("create-label").textContent = creatingLabel
+    ? "Creating…"
+    : `+ Create “${$("label-search").value.trim()}”`;
+  $("create-label").disabled = creatingLabel;
 }
+function closeLabels() {
+  $("labels-panel").hidden = true;
+  $("labels-toggle").setAttribute("aria-expanded", "false");
+}
+$("labels-toggle").addEventListener("click", () => {
+  const open = $("labels-panel").hidden;
+  $("labels-panel").hidden = !open;
+  $("labels-toggle").setAttribute("aria-expanded", String(open));
+  if (open) {
+    renderTags();
+    $("label-search").focus();
+  }
+});
+$("label-search").addEventListener("input", renderTags);
+$("labels-panel").addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.stopPropagation();
+    closeLabels();
+    $("labels-toggle").focus();
+  }
+  if (event.key === "Enter" && event.target === $("label-search")) {
+    event.preventDefault();
+    if (!$("create-label").hidden) $("create-label").click();
+  }
+});
+document.addEventListener("click", (event) => {
+  if (!$("tag-section").contains(event.target)) closeLabels();
+});
+$("create-label").addEventListener("click", async () => {
+  const name = $("label-search").value.trim();
+  if (!name || creatingLabel) return;
+  if (item.tagIds.length >= 30) {
+    $("labels-error").textContent = "Choose up to 30 labels.";
+    return;
+  }
+  creatingLabel = true;
+  $("save").disabled = true;
+  renderTags();
+  $("labels-error").textContent = "";
+  try {
+    const tag = await send("CREATE_TAG", { name });
+    if (!tags.some((t) => t.id === tag.id)) tags.push(tag);
+    tags.sort((a, b) => a.name.localeCompare(b.name));
+    if (!item.tagIds.includes(tag.id)) item.tagIds.push(tag.id);
+    $("label-search").value = "";
+    persist();
+  } catch (error) {
+    $("labels-error").textContent = error.message;
+  } finally {
+    creatingLabel = false;
+    $("save").disabled = saving;
+    renderTags();
+    $("label-search").focus();
+  }
+});
 function render() {
   $("item-name").textContent = item.name;
   setImage(item.image_url);
@@ -65,8 +150,6 @@ function render() {
   $("store-input").value = item.store || "";
   $("url-input").value = item.url;
   $("note-input").value = item.notes || "";
-  $("note-section").hidden = !item.notes;
-  $("add-note").hidden = !!item.notes;
   renderTags();
   state("form");
 }
@@ -85,7 +168,7 @@ function persist() {
   item = snapshot();
   send("SAVE_DRAFT", { url: sourceUrl, item })
     .then(() => {
-      $("draft-status").textContent = "Draft kept on this device.";
+      $("draft-status").textContent = "";
     })
     .catch(() => {
       $("draft-status").textContent =
@@ -99,7 +182,7 @@ function resetError() {
 function setBusy(busy) {
   saving = busy;
   $("save").disabled = busy;
-  $("save").textContent = busy ? "Saving your find…" : "Save to wishlist +";
+  $("save").textContent = busy ? "Saving your find…" : "Save to wishlist";
   $("item-name").contentEditable = busy ? "false" : "plaintext-only";
   document
     .querySelectorAll(
@@ -164,7 +247,6 @@ async function init() {
       state("success");
     } else {
       render();
-      if (entry) $("draft-status").textContent = "Your draft is back.";
     }
     send("GET_TAGS")
       .then((result) => {
@@ -267,11 +349,6 @@ $("price-editor").addEventListener("keydown", (event) => {
     $("edit-price").focus();
   }
 });
-$("add-note").addEventListener("click", () => {
-  $("note-section").hidden = false;
-  $("add-note").hidden = true;
-  $("note-input").focus();
-});
 for (const id of ["note-input", "store-input", "url-input"])
   $(id).addEventListener("input", persist);
 $("change-image").addEventListener("click", () => {
@@ -359,7 +436,7 @@ $("refresh-details").addEventListener("click", async () => {
 });
 $("item-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (saving) return;
+  if (saving || creatingLabel) return;
   if (!$("price-editor").hidden && !commitPrice()) return;
   item = snapshot();
   resetError();

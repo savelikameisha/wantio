@@ -149,24 +149,49 @@
               </div>
               <p id="source-label" class="source"></p>
             </div>
-            <div id="tag-section" class="tags-block" hidden>
-              <p class="section-label">Keep it organized</p>
-              <div id="tags" class="tags" aria-label="Tags"></div>
+            <div id="tag-section" class="labels-block">
+              <button
+                id="labels-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="labels-panel"
+              >
+                @label
+              </button>
+              <div id="labels-panel" class="labels-panel" hidden>
+                <label for="label-search">Labels</label>
+                <input
+                  id="label-search"
+                  type="text"
+                  maxlength="40"
+                  placeholder="Find or create a label"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <div
+                  id="tags"
+                  class="label-options"
+                  aria-label="Available labels"
+                ></div>
+                <p id="labels-empty" class="subtle"></p>
+                <button
+                  id="create-label"
+                  type="button"
+                  class="label-create"
+                  hidden
+                ></button>
+                <p id="labels-error" class="error" role="alert"></p>
+              </div>
             </div>
-            <button id="add-note" type="button" class="text-button">
-              + Add a private note
-            </button>
-            <div id="note-section" hidden>
-              <label for="note-input" class="section-label">Just for you</label
-              ><textarea
+            <details id="details">
+              <summary>More details <span aria-hidden="true">+</span></summary>
+              <label for="note-input">Private note</label>
+              <textarea
                 id="note-input"
                 maxlength="3000"
                 rows="2"
                 placeholder="Size, color, or a reason to remember it…"
               ></textarea>
-            </div>
-            <details id="details">
-              <summary>More details <span aria-hidden="true">+</span></summary>
               <label for="store-input">Store</label
               ><input id="store-input" maxlength="100" /><label for="url-input"
                 >Product link</label
@@ -194,11 +219,9 @@
           </div>
           <footer class="save-footer">
             <button id="save" class="primary" type="submit">
-              Save to wishlist <span aria-hidden="true">+</span>
+              Save to wishlist
             </button>
-            <p id="draft-status" class="fine">
-              Only you can see it until you share your list.
-            </p>
+            <p id="draft-status" class="fine" role="status"></p>
           </footer>
         </form>
       </section>
