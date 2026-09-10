@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Wantio \u2014 Add to Wishlist",
   "short_name": "Wantio",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Save products to your Wantio wishlist from the current page.",
   "icons": {
     "16": "icons/icon-16.png",
@@ -18,7 +18,11 @@
     },
     "default_title": "Add to Wantio"
   },
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
   "host_permissions": [
     "https://wantio.app/*",
     "https://zfrdcuztrujsmrsnppes.supabase.co/*"
@@ -28,8 +32,12 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://wantio.app/auth/extension*"],
-      "js": ["auth-content.js"],
+      "matches": [
+        "https://wantio.app/auth/extension*"
+      ],
+      "js": [
+        "auth-content.js"
+      ],
       "run_at": "document_idle"
     }
   ]

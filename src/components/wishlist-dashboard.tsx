@@ -61,22 +61,22 @@ export function WishlistDashboard({
       mutate(() => deleteItem(id));
   }
   return (
-    <div className="min-h-screen bg-background">
+    <div data-wantio-workspace className="min-h-screen bg-background">
       <a href="#main" className="sr-only focus:not-sr-only focus:block p-3">
         Skip to content
       </a>
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border/50">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center gap-3 flex-wrap">
+        <div className="max-w-6xl mx-auto px-4 py-4 grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
           <Link
             href="/"
-            className="flex items-center gap-2 min-h-11 font-semibold text-lg"
+            className="col-span-2 sm:col-span-1 flex items-center gap-2 min-h-11 font-semibold text-lg"
           >
             <img src="/icon.svg" alt="" className="h-8 w-8" />
             Wantio
           </Link>
           {activeView === "wishlist" && (
             <>
-              <label className="flex-1 min-w-36">
+              <label className="min-w-0">
                 <span className="sr-only">Search wishlist</span>
                 <Input
                   type="search"
@@ -166,7 +166,7 @@ export function WishlistDashboard({
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
                   {filtered.slice(0, limit).map((item) => (
                     <ProductCard
                       key={item.id}

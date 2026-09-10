@@ -10,7 +10,7 @@ export function ProductCard({
   onTap?: (item: WishlistItem) => void;
 }) {
   return (
-    <article className="overflow-hidden rounded-2xl border border-border/60 bg-card">
+    <article className="overflow-hidden rounded-2xl border border-border/60 bg-card transition-colors hover:border-foreground/20">
       <button
         onClick={() => onTap?.(item)}
         className="block w-full text-left"
@@ -19,7 +19,7 @@ export function ProductCard({
         <ImageWithFallback
           src={item.image_url}
           alt=""
-          className="w-full h-full object-contain p-3"
+          className="w-full h-full object-contain"
           fallbackClassName="aspect-square w-full"
         />
         <div className="p-3 space-y-1.5">

@@ -102,3 +102,45 @@ textarea {
     scroll-behavior: auto !important;
   }
 }
+
+/* Scope the neutral palette to the signed-in workspace, including portalled dialogs. */
+@layer base {
+  :root:has([data-wantio-workspace]) {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
+    --primary: 0 0% 7%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 94%;
+    --secondary-foreground: 0 0% 15%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 42%;
+    --accent: 0 0% 92%;
+    --accent-foreground: 0 0% 8%;
+    --border: 0 0% 89%;
+    --input: 0 0% 86%;
+    --ring: 0 0% 12%;
+  }
+  :root.dark:has([data-wantio-workspace]) {
+    --background: 0 0% 6%;
+    --foreground: 0 0% 96%;
+    --card: 0 0% 10%;
+    --card-foreground: 0 0% 96%;
+    --popover: 0 0% 12%;
+    --popover-foreground: 0 0% 96%;
+    --primary: 0 0% 96%;
+    --primary-foreground: 0 0% 7%;
+    --secondary: 0 0% 17%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 17%;
+    --muted-foreground: 0 0% 66%;
+    --accent: 0 0% 21%;
+    --accent-foreground: 0 0% 96%;
+    --border: 0 0% 20%;
+    --input: 0 0% 26%;
+    --ring: 0 0% 85%;
+  }
+}

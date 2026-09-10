@@ -1,15 +1,15 @@
 /* Wantio Chrome Extension — Popup Styles */
 
 :root {
-  --primary: #b8386b;
-  --primary-hover: #a33060;
-  --primary-light: #f8e8ef;
-  --background: #fff4f7;
+  --primary: #121212;
+  --primary-hover: #303030;
+  --primary-light: #eeeeee;
+  --background: #fafafa;
   --card: #ffffff;
-  --foreground: #1f1a1c;
-  --muted: #f2e8ec;
-  --muted-fg: #7a6970;
-  --border: #ebd8df;
+  --foreground: #141414;
+  --muted: #f0f0f0;
+  --muted-fg: #6b6b6b;
+  --border: #dedede;
   --radius: 10px;
   --success: #16a34a;
   --error: #dc2626;

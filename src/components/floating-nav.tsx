@@ -34,9 +34,9 @@ export function FloatingNav({
               aria-current={isActive ? "page" : undefined}
               onClick={() => onViewChange(item.id)}
               className={cn(
-                "flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-colors duration-200",
+                "flex min-h-11 min-w-11 items-center gap-2 px-4 py-2.5 rounded-full text-sm font-medium transition-colors duration-200",
                 isActive
-                  ? "bg-primary text-primary-foreground shadow-sm"
+                  ? "bg-muted text-foreground"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted",
               )}
             >

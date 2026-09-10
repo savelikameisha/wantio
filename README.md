@@ -63,3 +63,7 @@ Browser tests cover public pages by default. Providing `TEST_SUPABASE_SERVICE_RO
 Release 2 uses the production origin above. If you change the domain, update `background.js`, `popup.js`, and `manifest.json` together, plus Supabase redirect settings. `npm run build:extension` regenerates the shared price parser; do not hand-edit `chrome-extension/price.js`.
 
 Tokens stay in the extension's local storage and are refreshed by the background worker. Reconnect the extension after changing the Supabase project.
+
+## Brand assets
+
+`public/icon.svg` is the source for the supplied blue hexagon and white plus logo. `npm run build:extension` regenerates browser, Apple and Chrome-extension icons before packaging the extension.

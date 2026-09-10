@@ -80,7 +80,7 @@ export default function ExtensionAuthPage() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#FFF4F7",
+        background: "#FAFAFA",
         fontFamily:
           "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
       }}
@@ -107,11 +107,11 @@ export default function ExtensionAuthPage() {
         {status === "checking" && (
           <>
             <h2
-              style={{ fontSize: "18px", margin: "0 0 8px", color: "#1f1a1c" }}
+              style={{ fontSize: "18px", margin: "0 0 8px", color: "#141414" }}
             >
               Connecting...
             </h2>
-            <p style={{ fontSize: "14px", color: "#7a6970", margin: 0 }}>
+            <p style={{ fontSize: "14px", color: "#6b6b6b", margin: 0 }}>
               Checking your session
             </p>
           </>
@@ -120,12 +120,12 @@ export default function ExtensionAuthPage() {
         {status === "no-session" && (
           <>
             <h2
-              style={{ fontSize: "18px", margin: "0 0 8px", color: "#1f1a1c" }}
+              style={{ fontSize: "18px", margin: "0 0 8px", color: "#141414" }}
             >
               Sign in to Wantio
             </h2>
             <p
-              style={{ fontSize: "14px", color: "#7a6970", margin: "0 0 16px" }}
+              style={{ fontSize: "14px", color: "#6b6b6b", margin: "0 0 16px" }}
             >
               Connect your account to use the Chrome extension.
             </p>
@@ -134,7 +134,7 @@ export default function ExtensionAuthPage() {
               style={{
                 width: "100%",
                 padding: "10px 16px",
-                background: "#B8386B",
+                background: "#121212",
                 color: "white",
                 border: "none",
                 borderRadius: "10px",
@@ -154,11 +154,11 @@ export default function ExtensionAuthPage() {
         {status === "sending" && (
           <>
             <h2
-              style={{ fontSize: "18px", margin: "0 0 8px", color: "#1f1a1c" }}
+              style={{ fontSize: "18px", margin: "0 0 8px", color: "#141414" }}
             >
               Connecting...
             </h2>
-            <p style={{ fontSize: "14px", color: "#7a6970", margin: 0 }}>
+            <p style={{ fontSize: "14px", color: "#6b6b6b", margin: 0 }}>
               Sending your session to the extension
             </p>
           </>
@@ -171,7 +171,7 @@ export default function ExtensionAuthPage() {
             >
               ✓ Connected!
             </h2>
-            <p style={{ fontSize: "14px", color: "#7a6970", margin: 0 }}>
+            <p style={{ fontSize: "14px", color: "#6b6b6b", margin: 0 }}>
               You can close this tab and use the extension now.
             </p>
           </>
