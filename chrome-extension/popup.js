@@ -3,7 +3,7 @@
 let supabaseUrl, supabaseAnonKey;
 // State
 let accessToken = null;
-let wantioUrl = "https://wantio-saveli-desings.vercel.app";
+let wantioUrl = "https://wantio.app";
 let selectedTagIds = new Set();
 let allTags = [];
 let productData = {};

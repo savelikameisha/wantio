@@ -1,5 +1,5 @@
 // Wantio: session refresh lives in the worker, not in short-lived popups.
-const WANTIO_URL = "https://wantio-saveli-desings.vercel.app";
+const WANTIO_URL = "https://wantio.app";
 const TOKEN_KEY = "wantio_session";
 let refreshing = null;
 let config = null;

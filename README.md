@@ -2,7 +2,7 @@
 
 A personal wishlist: save product links or manual entries, organize them with tags, record purchases, and share a read-only list. Built with Next.js 16, React 19, Supabase and a Chrome extension.
 
-Production: https://wantio-saveli-desings.vercel.app
+Production: https://wantio.app
 
 ## Local development
 
