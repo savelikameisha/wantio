@@ -2,208 +2,256 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=380" />
-    <link rel="stylesheet" href="popup.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Wantio</title>
+    <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <!-- Loading State -->
-    <div id="state-loading" class="state">
-      <div class="header">
-        <img src="icons/icon-32.png" alt="Wantio" class="header-icon" />
-        <span class="header-title">Add to Wantio</span>
+    <header class="header">
+      <a class="brand" href="https://wantio.app" target="_blank" rel="noopener"
+        ><img src="icons/icon-32.png" alt="" width="28" height="28" /><span
+          >Wantio</span
+        ></a
+      ><button
+        id="menu-button"
+        class="icon-button"
+        aria-label="More options"
+        aria-expanded="false"
+        aria-controls="menu"
+      >
+        ···
+      </button>
+      <div id="menu" class="menu" hidden>
+        <a href="https://wantio.app" target="_blank">Open my wishlist ↗</a
+        ><a href="https://wantio.app/extension" target="_blank"
+          >Installation & updates ↗</a
+        ><button id="reconnect">Reconnect account</button
+        ><button id="disconnect">Disconnect this extension</button
+        ><span id="version" class="version"></span>
       </div>
-      <div class="loading-body">
-        <div class="spinner"></div>
-        <p class="loading-text">Extracting product details...</p>
-      </div>
-    </div>
-
-    <!-- Not Logged In State -->
-    <div id="state-login" class="state" style="display: none">
-      <div class="header">
-        <img src="icons/icon-32.png" alt="Wantio" class="header-icon" />
-        <span class="header-title">Add to Wantio</span>
-      </div>
-      <div class="login-body">
-        <div class="login-icon">
-          <svg
-            width="32"
-            height="32"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#B8386B"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
+    </header>
+    <main>
+      <section id="state-loading" class="state center-state" aria-busy="true">
+        <div class="skeleton-image"></div>
+        <div class="skeleton-title"></div>
+        <p class="subtle" role="status">Getting your find ready…</p>
+      </section>
+      <section id="state-login" class="state center-state" hidden>
+        <div class="state-mark">
+          <img src="icons/icon-128.png" width="72" height="72" alt="" />
         </div>
-        <p class="login-title">Not logged in</p>
-        <p class="login-desc">
-          Sign in to Wantio to start saving items to your wishlist.
+        <p class="eyebrow">A place for your next favorite</p>
+        <h1>Your finds,<br />all together.</h1>
+        <p class="state-copy">
+          Connect your Wantio account.<br />Then save something you love.
         </p>
-        <button id="btn-open-wantio" class="btn-primary">Open Wantio</button>
-      </div>
-    </div>
-
-    <!-- Form State -->
-    <div id="state-form" class="state" style="display: none">
-      <div class="header">
-        <img src="icons/icon-32.png" alt="Wantio" class="header-icon" />
-        <span class="header-title">Add to Wantio</span>
-        <div id="ai-badge" class="ai-badge" style="display: none">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M12 2l2.09 6.26L20.18 9l-4.64 4.14L16.54 20 12 16.27 7.46 20l1-6.86L3.82 9l6.09-.74z"
-            />
-          </svg>
-          AI Enhanced
+        <button id="connect" class="primary">
+          Connect to Wantio <span aria-hidden="true">↗</span>
+        </button>
+        <p class="fine">A sign-in tab opens in this browser.</p>
+      </section>
+      <section id="state-ready" class="state center-state" hidden>
+        <div class="state-mark">
+          <img src="icons/icon-128.png" width="64" height="64" alt="" />
         </div>
-      </div>
-
-      <!-- Product Preview -->
-      <div class="product-preview">
-        <div id="product-image-wrap" class="product-image-wrap">
-          <img id="product-image" src="" alt="" class="product-image" />
-          <div id="product-image-placeholder" class="product-image-placeholder">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.5"
+        <p class="eyebrow">You're connected</p>
+        <h1>Your next find<br />starts in a store.</h1>
+        <p class="state-copy">
+          Open a product page, then click the Wantio icon to save it here.
+        </p>
+        <a class="secondary" href="https://wantio.app" target="_blank"
+          >Open my wishlist ↗</a
+        >
+      </section>
+      <section id="state-form" class="state" hidden>
+        <form id="item-form" novalidate>
+          <div class="product-body">
+            <button
+              id="change-image"
+              type="button"
+              class="hero"
+              aria-label="Change product image"
+              aria-haspopup="dialog"
             >
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="8.5" cy="8.5" r="1.5" />
-              <path d="m21 15-5-5L5 21" />
-            </svg>
+              <img
+                id="product-image"
+                alt="Product preview"
+                hidden
+                referrerpolicy="no-referrer"
+              /><span id="image-placeholder" class="image-placeholder"
+                ><svg
+                  width="36"
+                  height="36"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="3" width="18" height="18" rx="4" />
+                  <path d="m3 16 5-5 5 5 3-3 5 5" />
+                  <circle cx="15" cy="8" r="1.5" /></svg
+                ><span>Choose an image</span></span
+              ><span class="image-affordance"
+                ><svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.6"
+                  aria-hidden="true"
+                >
+                  <path d="m16 3 5 5-12 12H4v-5Z" /></svg
+                ><span>Change image</span></span
+              >
+            </button>
+            <div class="product-text">
+              <h1
+                id="item-name"
+                contenteditable="plaintext-only"
+                role="textbox"
+                aria-label="Product name"
+                aria-multiline="false"
+                spellcheck="false"
+                data-placeholder="Name your find"
+              ></h1>
+              <button
+                id="edit-price"
+                type="button"
+                class="price"
+                aria-label="Edit price"
+                aria-expanded="false"
+              >
+                <span id="price-label">Add a price</span
+                ><span class="edit-mark" aria-hidden="true">✎</span>
+              </button>
+              <div id="price-editor" class="price-editor" hidden>
+                <div>
+                  <label for="price-input">Price</label
+                  ><input
+                    id="price-input"
+                    type="number"
+                    min="0"
+                    max="9999999999.99"
+                    step="0.01"
+                    inputmode="decimal"
+                    placeholder="Optional"
+                  />
+                </div>
+                <div>
+                  <label for="currency-input">Currency</label
+                  ><select id="currency-input"></select>
+                </div>
+                <button id="price-done" type="button" class="small-button">
+                  Done
+                </button>
+              </div>
+              <p id="source-label" class="source"></p>
+            </div>
+            <div id="tag-section" class="tags-block" hidden>
+              <p class="section-label">Keep it organized</p>
+              <div id="tags" class="tags" aria-label="Tags"></div>
+            </div>
+            <button id="add-note" type="button" class="text-button">
+              + Add a private note
+            </button>
+            <div id="note-section" hidden>
+              <label for="note-input" class="section-label">Just for you</label
+              ><textarea
+                id="note-input"
+                maxlength="3000"
+                rows="2"
+                placeholder="Size, color, or a reason to remember it…"
+              ></textarea>
+            </div>
+            <details id="details">
+              <summary>More details <span aria-hidden="true">+</span></summary>
+              <label for="store-input">Store</label
+              ><input id="store-input" maxlength="100" /><label for="url-input"
+                >Product link</label
+              ><input id="url-input" type="url" maxlength="2048" /><button
+                id="refresh-details"
+                type="button"
+                class="text-button"
+              >
+                Find details from this link ↗
+              </button>
+              <p class="fine">
+                Sends this link to Wantio to look up product details.
+              </p>
+            </details>
+            <p id="notice" class="notice" role="status"></p>
+            <p id="form-error" class="error" role="alert"></p>
+            <button
+              id="form-reconnect"
+              type="button"
+              class="text-button"
+              hidden
+            >
+              Reconnect your account ↗
+            </button>
           </div>
+          <footer class="save-footer">
+            <button id="save" class="primary" type="submit">
+              Save to wishlist <span aria-hidden="true">+</span>
+            </button>
+            <p id="draft-status" class="fine">
+              Only you can see it until you share your list.
+            </p>
+          </footer>
+        </form>
+      </section>
+      <section id="state-success" class="state center-state" hidden>
+        <div class="success-mark" aria-hidden="true">✓</div>
+        <p class="eyebrow">One less open tab</p>
+        <h1>Saved for later.</h1>
+        <p id="saved-name" class="state-copy"></p>
+        <a class="primary" href="https://wantio.app" target="_blank"
+          >See my wishlist ↗</a
+        ><button id="save-another" class="text-button">
+          Save another version
+        </button>
+      </section>
+      <section id="state-error" class="state center-state" hidden>
+        <div class="state-mark">
+          <img src="icons/icon-128.png" width="64" height="64" alt="" />
         </div>
-        <div class="product-info">
-          <p id="product-name-preview" class="product-name-preview"></p>
-          <p id="product-price-preview" class="product-price-preview"></p>
-          <p id="product-store-preview" class="product-store-preview"></p>
-        </div>
-      </div>
-
-      <!-- Editable Fields -->
-      <div class="form-fields">
-        <div class="field">
-          <label for="input-name">Product Name</label>
-          <input
-            type="text"
-            id="input-name"
-            placeholder="Product name"
-            required
-          />
-        </div>
-
-        <div class="field-row">
-          <div class="field flex-1">
-            <label for="input-price">Price</label>
-            <input
-              type="number"
-              id="input-price"
-              step="0.01"
-              min="0"
-              max="9999999999.99"
-              placeholder="0.00"
-            />
-          </div>
-          <div class="field" style="width: 80px">
-            <label for="input-currency">Currency</label>
-            <input
-              type="text"
-              id="input-currency"
-              placeholder="USD"
-              maxlength="3"
-            />
-          </div>
-          <div class="field flex-1">
-            <label for="input-store">Store</label>
-            <input type="text" id="input-store" placeholder="Store name" />
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="input-notes">Notes</label>
-          <textarea
-            id="input-notes"
-            rows="2"
-            placeholder="Product description..."
-          ></textarea>
-        </div>
-
-        <!-- Tags -->
-        <div id="tags-section" class="field" style="display: none">
-          <label>Tags</label>
-          <div id="tags-container" class="tags-container"></div>
-        </div>
-      </div>
-
-      <!-- Actions -->
-      <p
-        id="save-error"
-        role="alert"
-        class="error-desc"
-        style="padding: 0 16px"
-      ></p>
-      <div class="actions">
-        <button id="btn-save" class="btn-primary">
-          <span id="btn-save-text">Save to Wishlist</span>
-          <div
-            id="btn-save-spinner"
-            class="spinner-small"
-            style="display: none"
-          ></div>
+        <h1>Let's try that again.</h1>
+        <p id="error-message" class="state-copy" role="alert"></p>
+        <button id="retry" class="primary">Try again</button
+        ><button id="error-connect" class="text-button">
+          Reconnect to Wantio ↗
+        </button>
+      </section>
+    </main>
+    <dialog id="image-picker" aria-labelledby="image-picker-title">
+      <div class="picker-header">
+        <h2 id="image-picker-title">Choose the image</h2>
+        <button
+          id="close-picker"
+          class="icon-button"
+          aria-label="Close image picker"
+        >
+          ×
         </button>
       </div>
-    </div>
-
-    <!-- Success State -->
-    <div id="state-success" class="state" style="display: none">
-      <div class="header">
-        <img src="icons/icon-32.png" alt="Wantio" class="header-icon" />
-        <span class="header-title">Add to Wantio</span>
-      </div>
-      <div class="success-body">
-        <div class="success-icon">
-          <svg
-            width="48"
-            height="48"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#16a34a"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
+      <p class="subtle">Pick one from this page, or paste an image link.</p>
+      <div id="image-options" class="image-options"></div>
+      <form id="image-link-form">
+        <label for="image-link">Image link</label>
+        <div class="image-link-row">
+          <input
+            id="image-link"
+            type="url"
+            placeholder="https://…"
+            maxlength="2048"
+          /><button class="small-button" type="submit">Use image</button>
         </div>
-        <p class="success-title">Added to Wishlist!</p>
-        <p class="success-desc">The item has been saved.</p>
-      </div>
-    </div>
-
-    <!-- Error State -->
-    <div id="state-error" class="state" style="display: none">
-      <div class="header">
-        <img src="icons/icon-32.png" alt="Wantio" class="header-icon" />
-        <span class="header-title">Add to Wantio</span>
-      </div>
-      <div class="error-body">
-        <p class="error-title">Something went wrong</p>
-        <p id="error-message" class="error-desc"></p>
-        <button id="btn-retry" class="btn-outline">Try Again</button>
-      </div>
-    </div>
-
-    <script src="popup.js"></script>
+        <p id="image-error" class="error" role="alert"></p>
+      </form>
+      <button id="remove-image" class="text-button">Remove image</button>
+    </dialog>
+    <script type="module" src="popup.js"></script>
   </body>
 </html>

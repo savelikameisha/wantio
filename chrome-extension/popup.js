@@ -1,381 +1,440 @@
-// Wantio Chrome Extension — Popup Logic
-
-let supabaseUrl, supabaseAnonKey;
-// State
-let accessToken = null;
-let wantioUrl = "https://wantio.app";
-let selectedTagIds = new Set();
-let allTags = [];
-let productData = {};
-let saving = false;
-const itemId = crypto.randomUUID();
-let userEdited = false;
-
-// DOM refs
-const states = {
-  loading: document.getElementById("state-loading"),
-  login: document.getElementById("state-login"),
-  form: document.getElementById("state-form"),
-  success: document.getElementById("state-success"),
-  error: document.getElementById("state-error"),
-};
-
-function showState(name) {
-  Object.values(states).forEach((el) => (el.style.display = "none"));
-  states[name].style.display = "block";
+import { send, appUrl, webUrl, money, newerVersion } from "./lib/popup-api.js";
+const $ = (id) => document.getElementById(id);
+let item,
+  sourceUrl,
+  images = [],
+  tags = [],
+  saving = false,
+  dirty = false,
+  loadingDetails = false,
+  connected = false;
+let nameBeforeFocus = "";
+function state(name) {
+  document.querySelectorAll(".state").forEach((el) => {
+    el.hidden = el.id !== `state-${name}`;
+  });
 }
-
-// ── Init ──────────────────────────────────────────────────────────────
-
-document.addEventListener("DOMContentLoaded", async () => {
-  showState("loading");
-  document.querySelectorAll("input,textarea").forEach((el) =>
-    el.addEventListener("input", () => {
-      userEdited = true;
-    }),
-  );
-
-  try {
-    // Get Wantio URL from storage
-    const urlResult = await chrome.runtime.sendMessage({
-      type: "GET_CONFIG",
+function showError(error, inline = false) {
+  const el = $(inline ? "form-error" : "error-message");
+  el.textContent = error.message || String(error);
+  if (inline) $("form-reconnect").hidden = error.code !== "auth";
+  else state("error");
+}
+function connect() {
+  chrome.tabs.create({ url: `${appUrl}/auth/extension` });
+  window.close();
+}
+function setImage(url) {
+  item.image_url = url || "";
+  const img = $("product-image");
+  img.hidden = !url;
+  $("image-placeholder").hidden = !!url;
+  if (url) img.src = url;
+  else img.removeAttribute("src");
+}
+function renderPrice() {
+  $("price-label").textContent = money(item.current_price, item.currency);
+  $("price-input").value = item.current_price ?? "";
+  $("currency-input").value = item.currency;
+}
+function renderTags() {
+  $("tag-section").hidden = !tags.length;
+  const container = $("tags");
+  container.replaceChildren();
+  for (const tag of tags) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "tag";
+    button.textContent = tag.name;
+    button.setAttribute("aria-pressed", String(item.tagIds.includes(tag.id)));
+    button.addEventListener("click", () => {
+      item.tagIds = item.tagIds.includes(tag.id)
+        ? item.tagIds.filter((id) => id !== tag.id)
+        : [...item.tagIds, tag.id];
+      renderTags();
+      persist();
     });
-    if (urlResult?.error) throw new Error(urlResult.error);
-    if (urlResult?.url) wantioUrl = urlResult.url;
-    supabaseUrl = urlResult.supabaseUrl;
-    supabaseAnonKey = urlResult.supabaseAnonKey;
-
-    // Check auth session
-    const session = await chrome.runtime.sendMessage({ type: "GET_SESSION" });
-
-    if (!session?.access_token) {
-      showState("login");
-      setupLoginButton();
+    container.append(button);
+  }
+}
+function render() {
+  $("item-name").textContent = item.name;
+  setImage(item.image_url);
+  renderPrice();
+  $("source-label").textContent = item.store || new URL(sourceUrl).hostname;
+  $("store-input").value = item.store || "";
+  $("url-input").value = item.url;
+  $("note-input").value = item.notes || "";
+  $("note-section").hidden = !item.notes;
+  $("add-note").hidden = !!item.notes;
+  renderTags();
+  state("form");
+}
+function snapshot() {
+  return {
+    ...item,
+    name: $("item-name").textContent.trim(),
+    notes: $("note-input").value,
+    store: $("store-input").value.trim(),
+    url: $("url-input").value.trim(),
+  };
+}
+function persist() {
+  if (!item || saving) return;
+  dirty = true;
+  item = snapshot();
+  send("SAVE_DRAFT", { url: sourceUrl, item })
+    .then(() => {
+      $("draft-status").textContent = "Draft kept on this device.";
+    })
+    .catch(() => {
+      $("draft-status").textContent =
+        "Could not keep the draft. Leave this window open.";
+    });
+}
+function resetError() {
+  $("form-error").textContent = "";
+  $("form-reconnect").hidden = true;
+}
+function setBusy(busy) {
+  saving = busy;
+  $("save").disabled = busy;
+  $("save").textContent = busy ? "Saving your find…" : "Save to wishlist +";
+  $("item-name").contentEditable = busy ? "false" : "plaintext-only";
+  document
+    .querySelectorAll(
+      "#item-form input,#item-form textarea,#item-form select,#item-form button",
+    )
+    .forEach((el) => {
+      el.disabled = busy;
+    });
+}
+async function init() {
+  state("loading");
+  try {
+    const session = await send("GET_SESSION");
+    if (!session) {
+      state("login");
       return;
     }
-
-    accessToken = session.access_token;
-
-    // Get current tab
+    connected = true;
     const [tab] = await chrome.tabs.query({
       active: true,
       currentWindow: true,
     });
-
+    sourceUrl = webUrl(tab?.url);
     if (
-      !tab?.id ||
-      tab.url?.startsWith("chrome://") ||
-      tab.url?.startsWith("about:")
+      !sourceUrl ||
+      new URL(sourceUrl).origin === appUrl ||
+      new URL(sourceUrl).hostname === "chromewebstore.google.com"
     ) {
-      showError(
-        "Cannot extract data from this page. Navigate to a product page and try again.",
-      );
+      state("ready");
       return;
     }
-
-    // Run content script to extract data from page
-    let contentData = null;
+    let extracted = {};
     try {
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id },
         files: ["price.js", "content.js"],
       });
-      contentData = results?.[0]?.result;
+      extracted = results?.[0]?.result || {};
     } catch {
-      // Content script injection may fail on some pages
+      $("notice").textContent =
+        "This page could not be read. You can still add the details yourself.";
     }
-
-    if (contentData) {
-      productData = contentData;
-      displayForm(contentData);
+    images =
+      extracted.images || (extracted.image_url ? [extracted.image_url] : []);
+    const entry = await send("GET_DRAFT", { url: sourceUrl });
+    item = entry?.item || {
+      id: crypto.randomUUID(),
+      name: extracted.name || tab.title || "",
+      url: sourceUrl,
+      image_url: webUrl(extracted.image_url) || "",
+      current_price: extracted.price ?? undefined,
+      currency: extracted.currency || "USD",
+      store: extracted.store || new URL(sourceUrl).hostname,
+      notes: "",
+      tagIds: [],
+    };
+    dirty = !!entry;
+    if (!Intl.supportedValuesOf("currency").includes(item.currency))
+      item.currency = "USD";
+    if (entry?.saved) {
+      $("saved-name").textContent = item.name;
+      state("success");
     } else {
-      // Fallback: just use the tab URL
-      productData = { url: tab.url, name: tab.title };
-      displayForm(productData);
+      render();
+      if (entry) $("draft-status").textContent = "Your draft is back.";
     }
-
-    // Fetch tags and AI-enhanced scrape in parallel
-    await fetchTags();
-    await fetchAiScrape(tab.url);
-  } catch (err) {
-    showError(err.message || "Something went wrong");
+    send("GET_TAGS")
+      .then((result) => {
+        tags = result;
+        renderTags();
+      })
+      .catch((error) => {
+        $("notice").textContent =
+          error.code === "auth"
+            ? "Reconnect to load your tags."
+            : "Tags are unavailable right now. You can still save this item.";
+      });
+    send("GET_CONFIG")
+      .then((config) => {
+        if (
+          newerVersion(
+            chrome.runtime.getManifest().version,
+            config.extensionVersion,
+          )
+        )
+          $("version").textContent += " · Update available";
+      })
+      .catch(() => {});
+  } catch (error) {
+    if (error.code === "auth") state("login");
+    else showError(error);
+  }
+}
+$("version").textContent = `Version ${chrome.runtime.getManifest().version}`;
+for (const currency of Intl.supportedValuesOf("currency")) {
+  const option = document.createElement("option");
+  option.value = currency;
+  option.textContent = currency;
+  $("currency-input").append(option);
+}
+$("menu-button").addEventListener("click", () => {
+  const open = $("menu").hidden;
+  $("menu").hidden = !open;
+  $("menu-button").setAttribute("aria-expanded", String(open));
+});
+document.addEventListener("click", (event) => {
+  if (
+    !$("menu").contains(event.target) &&
+    !$("menu-button").contains(event.target)
+  ) {
+    $("menu").hidden = true;
+    $("menu-button").setAttribute("aria-expanded", "false");
   }
 });
-
-// ── Login ─────────────────────────────────────────────────────────────
-
-function setupLoginButton() {
-  document.getElementById("btn-open-wantio").addEventListener("click", () => {
-    chrome.tabs.create({ url: `${wantioUrl}/auth/extension` });
-    window.close();
-  });
+for (const id of ["connect", "reconnect", "error-connect", "form-reconnect"])
+  $(id).addEventListener("click", connect);
+$("retry").addEventListener("click", () => location.reload());
+$("product-image").addEventListener("error", () => {
+  $("product-image").hidden = true;
+  $("image-placeholder").hidden = false;
+});
+$("item-name").addEventListener("focus", () => {
+  nameBeforeFocus = $("item-name").textContent;
+});
+$("item-name").addEventListener("input", persist);
+$("item-name").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    event.currentTarget.blur();
+  }
+  if (event.key === "Escape") {
+    event.currentTarget.textContent = nameBeforeFocus;
+    event.currentTarget.blur();
+    persist();
+  }
+});
+$("edit-price").addEventListener("click", () => {
+  $("price-editor").hidden = false;
+  $("edit-price").setAttribute("aria-expanded", "true");
+  $("price-input").focus();
+});
+function commitPrice() {
+  const input = $("price-input");
+  if (!input.checkValidity()) {
+    input.reportValidity();
+    return false;
+  }
+  item.current_price = input.value === "" ? undefined : Number(input.value);
+  item.currency = $("currency-input").value;
+  renderPrice();
+  $("price-editor").hidden = true;
+  $("edit-price").setAttribute("aria-expanded", "false");
+  persist();
+  return true;
 }
-
-// ── Form Display ──────────────────────────────────────────────────────
-
-function displayForm(data) {
-  showState("form");
-
-  // Preview
-  const imgEl = document.getElementById("product-image");
-  const imgPlaceholder = document.getElementById("product-image-placeholder");
-  if (data.image_url) {
-    imgEl.src = data.image_url;
-    imgEl.style.display = "block";
-    imgPlaceholder.style.display = "none";
-    imgEl.onerror = () => {
-      imgEl.style.display = "none";
-      imgPlaceholder.style.display = "flex";
+$("price-done").addEventListener("click", commitPrice);
+$("price-editor").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    commitPrice();
+  }
+  if (event.key === "Escape") {
+    renderPrice();
+    $("price-editor").hidden = true;
+    $("edit-price").focus();
+  }
+});
+$("add-note").addEventListener("click", () => {
+  $("note-section").hidden = false;
+  $("add-note").hidden = true;
+  $("note-input").focus();
+});
+for (const id of ["note-input", "store-input", "url-input"])
+  $(id).addEventListener("input", persist);
+$("change-image").addEventListener("click", () => {
+  const options = $("image-options");
+  options.replaceChildren();
+  const choices = [...new Set([item.image_url, ...images].filter(Boolean))];
+  choices.forEach((url, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "image-option";
+    button.setAttribute("aria-label", `Choose image ${index + 1}`);
+    button.setAttribute("aria-pressed", String(url === item.image_url));
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = "";
+    img.referrerPolicy = "no-referrer";
+    button.append(img);
+    button.addEventListener("click", () => {
+      setImage(url);
+      $("image-picker").close();
+      persist();
+    });
+    options.append(button);
+  });
+  $("image-error").textContent = "";
+  $("image-link").value = "";
+  $("image-picker").showModal();
+});
+$("close-picker").addEventListener("click", () => $("image-picker").close());
+$("image-link-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  const url = webUrl($("image-link").value);
+  if (!url) {
+    $("image-error").textContent = "Use an http or https image link.";
+    return;
+  }
+  setImage(url);
+  images.unshift(url);
+  $("image-picker").close();
+  persist();
+});
+$("remove-image").addEventListener("click", () => {
+  setImage("");
+  $("image-picker").close();
+  persist();
+});
+$("refresh-details").addEventListener("click", async () => {
+  const url = webUrl($("url-input").value);
+  if (!url) {
+    showError(new Error("Enter a valid product link."), true);
+    return;
+  }
+  if (loadingDetails) return;
+  loadingDetails = true;
+  dirty = false;
+  $("refresh-details").disabled = true;
+  $("notice").textContent = "Looking up product details…";
+  resetError();
+  try {
+    const result = await send("SCRAPE", { url, tags: tags.map((t) => t.name) });
+    if (dirty || saving || item.url !== url) {
+      $("notice").textContent =
+        "Kept your edits. The lookup did not replace them.";
+      return;
+    }
+    item = {
+      ...item,
+      name: result.name || item.name,
+      current_price: result.price ?? item.current_price,
+      currency: result.currency || item.currency,
+      image_url: webUrl(result.image_url) || item.image_url,
+      store: result.store || item.store,
     };
+    render();
+    persist();
+    $("notice").textContent =
+      "Details refreshed. Check the price before saving.";
+  } catch (error) {
+    showError(error, true);
+    $("notice").textContent = "You can enter the details yourself.";
+  } finally {
+    loadingDetails = false;
+    $("refresh-details").disabled = false;
   }
-
-  document.getElementById("product-name-preview").textContent =
-    data.name || "Unknown Product";
-  document.getElementById("product-price-preview").textContent = data.price
-    ? `${getCurrencySymbol(data.currency)}${data.price}`
-    : "";
-  document.getElementById("product-store-preview").textContent =
-    data.store || "";
-
-  // Form inputs
-  document.getElementById("input-name").value = data.name || "";
-  document.getElementById("input-price").value = data.price ?? "";
-  document.getElementById("input-currency").value = data.currency || "USD";
-  document.getElementById("input-store").value = data.store || "";
-  document.getElementById("input-notes").value = data.notes || "";
-
-  // Save button
-  document.getElementById("btn-save").addEventListener("click", handleSave);
-}
-
-function updateFormWithAiData(data) {
-  if (userEdited || saving) return;
-  if (data.name) {
-    document.getElementById("input-name").value = data.name;
-    document.getElementById("product-name-preview").textContent = data.name;
-  }
-  if (data.price != null) {
-    document.getElementById("input-price").value = data.price;
-    document.getElementById("product-price-preview").textContent =
-      `${getCurrencySymbol(data.currency)}${data.price}`;
-  }
-  if (data.image_url) {
-    const imgEl = document.getElementById("product-image");
-    const imgPlaceholder = document.getElementById("product-image-placeholder");
-    imgEl.src = data.image_url;
-    imgEl.style.display = "block";
-    imgPlaceholder.style.display = "none";
-  }
-  if (data.store) {
-    document.getElementById("input-store").value = data.store;
-    document.getElementById("product-store-preview").textContent = data.store;
-  }
-  if (data.currency) {
-    document.getElementById("input-currency").value = data.currency;
-  }
-  if (data.notes) {
-    document.getElementById("input-notes").value = data.notes;
-  }
-  if (data.ai_enhanced) {
-    document.getElementById("ai-badge").style.display = "inline-flex";
-  }
-
-  // AI-suggested tags
-  if (data.suggested_tags && Array.isArray(data.suggested_tags)) {
-    data.suggested_tags.forEach((tagName) => {
-      const tag = allTags.find(
-        (t) => t.name.toLowerCase() === tagName.toLowerCase(),
-      );
-      if (tag) {
-        selectedTagIds.add(tag.id);
-      }
-    });
-    renderTags();
-  }
-
-  // Update productData
-  Object.assign(productData, data);
-}
-
-// ── Tags ──────────────────────────────────────────────────────────────
-
-async function fetchTags() {
-  try {
-    const res = await fetch(`${supabaseUrl}/rest/v1/tags?select=*&order=name`, {
-      headers: {
-        apikey: supabaseAnonKey,
-        Authorization: `Bearer ${accessToken}`,
-      },
-    });
-
-    if (!res.ok) return;
-
-    allTags = await res.json();
-    if (allTags.length > 0) {
-      renderTags();
-    }
-  } catch {
-    // Tags fetch failed — not critical
-  }
-}
-
-function renderTags() {
-  if (allTags.length === 0) return;
-
-  const section = document.getElementById("tags-section");
-  section.style.display = "flex";
-
-  const container = document.getElementById("tags-container");
-  container.innerHTML = "";
-
-  allTags.forEach((tag) => {
-    const badge = document.createElement("button");
-    badge.type = "button";
-    badge.setAttribute("aria-pressed", String(selectedTagIds.has(tag.id)));
-    badge.className = `tag-badge${selectedTagIds.has(tag.id) ? " selected" : ""}`;
-    badge.textContent = tag.name;
-
-    if (selectedTagIds.has(tag.id)) {
-      badge.style.backgroundColor = tag.color;
-      badge.style.borderColor = "transparent";
-    }
-
-    badge.addEventListener("click", () => {
-      userEdited = true;
-      badge.setAttribute("aria-pressed", String(!selectedTagIds.has(tag.id)));
-      if (selectedTagIds.has(tag.id)) {
-        selectedTagIds.delete(tag.id);
-        badge.classList.remove("selected");
-        badge.style.backgroundColor = "";
-        badge.style.borderColor = "";
-      } else {
-        selectedTagIds.add(tag.id);
-        badge.classList.add("selected");
-        badge.style.backgroundColor = tag.color;
-        badge.style.borderColor = "transparent";
-      }
-    });
-
-    container.appendChild(badge);
-  });
-}
-
-// ── AI Scrape ─────────────────────────────────────────────────────────
-
-async function fetchAiScrape(url) {
-  try {
-    const tagNames = allTags.map((t) => t.name);
-
-    const res = await fetch(`${wantioUrl}/api/scrape`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ url, existingTags: tagNames }),
-    });
-
-    if (!res.ok) return;
-
-    const data = await res.json();
-    updateFormWithAiData(data);
-  } catch {
-    // AI scrape failed — content script data is sufficient
-  }
-}
-
-// ── Save ──────────────────────────────────────────────────────────────
-
-async function handleSave() {
+});
+$("item-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
   if (saving) return;
-  saving = true;
-  const btn = document.getElementById("btn-save");
-  const btnText = document.getElementById("btn-save-text");
-  const btnSpinner = document.getElementById("btn-save-spinner");
-
-  btn.disabled = true;
-  btnText.textContent = "Saving...";
-  btnSpinner.style.display = "block";
-
-  try {
-    const name = document.getElementById("input-name").value.trim();
-    if (!name) {
-      throw new Error("Product name is required");
-    }
-
-    const priceStr = document.getElementById("input-price").value;
-    const price = priceStr ? parseFloat(priceStr) : undefined;
-
-    const body = {
-      id: itemId,
-      name,
-      url: productData.url || undefined,
-      image_url: productData.image_url || undefined,
-      current_price: price,
-      store: document.getElementById("input-store").value.trim() || undefined,
-      notes: document.getElementById("input-notes").value.trim() || undefined,
-      currency: document.getElementById("input-currency").value.trim() || "USD",
-      tagIds: Array.from(selectedTagIds),
-    };
-
-    const latest = await chrome.runtime.sendMessage({ type: "GET_SESSION" });
-    if (!latest?.access_token) throw new Error("Sign in to Wantio again.");
-    accessToken = latest.access_token;
-    const res = await fetch(`${wantioUrl}/api/items`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.error || "Failed to save item");
-    }
-
-    // Success!
-    showState("success");
-    setTimeout(() => window.close(), 1500);
-  } catch (err) {
-    saving = false;
-    btn.disabled = false;
-    btnText.textContent = "Save to Wishlist";
-    btnSpinner.style.display = "none";
-    document.getElementById("save-error").textContent = err.message;
+  if (!$("price-editor").hidden && !commitPrice()) return;
+  item = snapshot();
+  resetError();
+  if (!item.name || item.name.length > 200) {
+    showError(new Error("Give this find a name, up to 200 characters."), true);
+    $("item-name").focus();
+    return;
   }
-}
+  if (!webUrl(item.url)) {
+    showError(new Error("Check the product link in More details."), true);
+    $("details").open = true;
+    $("url-input").focus();
+    return;
+  }
+  if (!$("item-form").reportValidity()) return;
+  setBusy(true);
+  try {
+    await send("SAVE_ITEM", { item, url: sourceUrl });
+    $("saved-name").textContent = item.name;
+    state("success");
+  } catch (error) {
+    showError(error, true);
+  } finally {
+    setBusy(false);
+  }
+});
+$("save-another").addEventListener("click", async () => {
+  await send("CLEAR_DRAFT", { url: sourceUrl });
+  item.id = crypto.randomUUID();
+  render();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !$("image-picker").open) {
+    $("menu").hidden = true;
+    $("menu-button").setAttribute("aria-expanded", "false");
+  }
+  if (
+    (event.metaKey || event.ctrlKey) &&
+    event.key === "Enter" &&
+    !$("state-form").hidden
+  ) {
+    event.preventDefault();
+    $("item-form").requestSubmit();
+  }
+});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (
+    area === "local" &&
+    changes.wantio_session &&
+    !connected &&
+    !$("state-login").hidden
+  )
+    init();
+});
+init();
 
-// ── Error ─────────────────────────────────────────────────────────────
-
-function showError(message) {
-  showState("error");
-  document.getElementById("error-message").textContent = message;
-  document.getElementById("btn-retry").addEventListener("click", () => {
-    window.location.reload();
+$("disconnect").addEventListener("click", async () => {
+  try {
+    await send("LOGOUT");
+    connected = false;
+    $("menu").hidden = true;
+    $("menu-button").setAttribute("aria-expanded", "false");
+    state("login");
+  } catch (error) {
+    showError(error);
+  }
+});
+for (const id of ["price-input", "currency-input"])
+  $(id).addEventListener("input", () => {
+    dirty = true;
+    if (!$("price-input").checkValidity()) return;
+    item.current_price =
+      $("price-input").value === ""
+        ? undefined
+        : Number($("price-input").value);
+    item.currency = $("currency-input").value;
+    persist();
   });
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────
-
-function getCurrencySymbol(currency) {
-  const symbols = {
-    USD: "$",
-    EUR: "\u20AC",
-    GBP: "\u00A3",
-    JPY: "\u00A5",
-    CAD: "CA$",
-    AUD: "A$",
-    INR: "\u20B9",
-    KRW: "\u20A9",
-    BRL: "R$",
-    MXN: "MX$",
-    SEK: "kr ",
-    NOK: "kr ",
-    DKK: "kr ",
-    CHF: "CHF ",
-    PLN: "z\u0142",
-  };
-  return symbols[currency] || "$";
-}

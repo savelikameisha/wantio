@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Wantio \u2014 Add to Wishlist",
   "short_name": "Wantio",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Save products to your Wantio wishlist from the current page.",
   "icons": {
     "16": "icons/icon-16.png",
@@ -28,7 +28,8 @@
     "https://zfrdcuztrujsmrsnppes.supabase.co/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
@@ -40,5 +41,7 @@
       ],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "homepage_url": "https://wantio.app/extension",
+  "minimum_chrome_version": "116"
 }

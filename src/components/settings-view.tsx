@@ -248,7 +248,7 @@ export function SettingsView({
       <div className="border rounded-xl p-4 space-y-3">
         <h2 className="font-medium">Chrome extension</h2>
         <p className="text-sm text-muted-foreground">Save products directly from a store page.</p>
-        <Button asChild variant="outline"><a href="/wantio-extension.zip" download>Download extension</a></Button>
+        <Button asChild variant="outline"><a href="/extension">Install or update extension</a></Button>
         <details className="text-sm text-muted-foreground"><summary className="cursor-pointer min-h-11 flex items-center">How to install</summary><p>Unzip the download. Open chrome://extensions, enable Developer mode, choose Load unpacked, and select the unzipped folder. Open Wantio in the extensions menu to connect your account.</p></details>
       </div>
       <form action="/auth/signout" method="post">

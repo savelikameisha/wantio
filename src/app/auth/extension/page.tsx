@@ -1,182 +1,224 @@
 "use client";
-
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import {
+  ArrowUpRight,
+  Check,
+  LoaderCircle,
+  MousePointer2,
+  ShoppingBag,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
 
+type Status = "checking" | "sending" | "success" | "no-session" | "missing";
 export default function ExtensionAuthPage() {
-  const [status, setStatus] = useState<
-    "checking" | "sending" | "success" | "no-session" | "missing"
-  >("checking");
-
+  const [status, setStatus] = useState<Status>("checking");
+  const [error, setError] = useState("");
+  const [opening, setOpening] = useState(false);
+  const [version, setVersion] = useState("");
   useEffect(() => {
-    const onConnected = (event: MessageEvent) => {
+    let active = true;
+    let timeout: ReturnType<typeof setTimeout>;
+    const connected = (event: MessageEvent) => {
       if (
         event.source === window &&
-        event.origin === window.location.origin &&
+        event.origin === location.origin &&
         event.data?.type === "WANTIO_EXTENSION_CONNECTED"
       ) {
         clearTimeout(timeout);
+        sessionStorage.removeItem("wantio_ext_token");
+        setVersion(
+          typeof event.data.version === "string" ? event.data.version : "",
+        );
         setStatus("success");
       }
     };
-    window.addEventListener("message", onConnected);
-    const timeout = setTimeout(
-      () => setStatus((s) => (s === "sending" ? "missing" : s)),
-      18000,
-    );
-    async function handleAuth() {
-      const supabase = createClient();
+    window.addEventListener("message", connected);
+    async function start() {
       const {
         data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
+        error,
+      } = await createClient().auth.getSession();
+      if (!active) return;
+      if (error || !session) {
         setStatus("no-session");
         return;
       }
-
       setStatus("sending");
-
-      // Store token in sessionStorage for the content script to pick up
-      const tokenData = {
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-        expires_at: session.expires_at,
-        user: {
-          id: session.user.id,
-          email: session.user.email,
-        },
-      };
-
-      sessionStorage.setItem("wantio_ext_token", JSON.stringify(tokenData));
+      sessionStorage.setItem(
+        "wantio_ext_token",
+        JSON.stringify({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+          expires_at: session.expires_at,
+        }),
+      );
+      timeout = setTimeout(() => {
+        sessionStorage.removeItem("wantio_ext_token");
+        setStatus("missing");
+      }, 18000);
     }
-
-    handleAuth().catch(() => setStatus("no-session"));
+    start().catch(() => {
+      if (active) {
+        setError("We could not check your account. Please try again.");
+        setStatus("no-session");
+      }
+    });
     return () => {
+      active = false;
       clearTimeout(timeout);
-      window.removeEventListener("message", onConnected);
+      window.removeEventListener("message", connected);
       sessionStorage.removeItem("wantio_ext_token");
     };
   }, []);
-
-  // If no session, trigger Google login that redirects back here
-  async function handleLogin() {
-    const supabase = createClient();
-    const { data } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=/auth/extension`,
-      },
-    });
-    if (data.url) {
-      window.location.href = data.url;
+  async function login() {
+    setOpening(true);
+    setError("");
+    try {
+      const { data, error } = await createClient().auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${location.origin}/auth/callback?next=/auth/extension`,
+        },
+      });
+      if (error || !data.url) throw error || new Error();
+      location.assign(data.url);
+    } catch {
+      setError("Google sign-in did not open. Please try again.");
+      setOpening(false);
     }
   }
-
+  const waiting = status === "checking" || status === "sending";
   return (
     <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#FAFAFA",
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-      }}
+      data-wantio-workspace
+      className="min-h-dvh bg-background text-foreground flex flex-col"
     >
-      <div
-        style={{
-          textAlign: "center",
-          padding: "32px",
-          background: "white",
-          borderRadius: "16px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
-          maxWidth: "360px",
-          width: "100%",
-        }}
-      >
-        <img
-          src="/icon.svg"
-          alt="Wantio"
-          width={48}
-          height={48}
-          style={{ marginBottom: "16px" }}
-        />
-
-        {status === "checking" && (
-          <>
-            <h2
-              style={{ fontSize: "18px", margin: "0 0 8px", color: "#141414" }}
-            >
-              Connecting...
-            </h2>
-            <p style={{ fontSize: "14px", color: "#6b6b6b", margin: 0 }}>
-              Checking your session
+      <header className="flex items-center justify-between max-w-5xl w-full mx-auto px-6 py-5">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 min-h-11 text-base font-semibold"
+        >
+          <img src="/icon.svg" width="30" height="30" alt="" />
+          Wantio
+        </Link>
+        <Link
+          href="/extension"
+          className="inline-flex items-center gap-1 min-h-11 text-sm text-muted-foreground"
+        >
+          Extension help <ArrowUpRight size={15} />
+        </Link>
+      </header>
+      <main className="flex-1 flex items-center justify-center px-6 pb-16">
+        <section
+          className="max-w-sm w-full"
+          aria-live="polite"
+          aria-busy={waiting}
+        >
+          <div className="mb-7 h-14 w-14 flex items-center justify-center rounded-2xl bg-card border border-border/60">
+            {status === "success" ? (
+              <Check size={26} strokeWidth={1.5} />
+            ) : waiting ? (
+              <LoaderCircle className="animate-spin" size={24} />
+            ) : (
+              <img src="/icon.svg" width="38" height="38" alt="" />
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mb-3 tracking-wide">
+            WANTIO FOR CHROME{version ? ` · ${version}` : ""}
+          </p>
+          <h1 className="text-4xl font-semibold tracking-tight leading-[1.12]">
+            {status === "success" ? (
+              <>
+                Your next find.
+                <br />
+                One click away.
+              </>
+            ) : status === "missing" ? (
+              <>
+                Almost there.
+                <br />
+                Let’s connect Chrome.
+              </>
+            ) : waiting ? (
+              "Making the connection…"
+            ) : (
+              <>
+                Good finds deserve
+                <br />a place to stay.
+              </>
+            )}
+          </h1>
+          <p className="text-muted-foreground text-sm leading-6 mt-5">
+            {status === "success"
+              ? "Your account is connected. You can close this tab and go back to the store."
+              : status === "missing"
+                ? "We could not find the extension in this browser. Install or update Wantio, then come back here."
+                : waiting
+                  ? "Keep this tab open for a moment while Wantio connects to your extension."
+                  : "Sign in with your usual Google account to connect the Wantio extension."}
+          </p>
+          {error && (
+            <p role="alert" className="text-sm text-destructive mt-4">
+              {error}
             </p>
-          </>
-        )}
-
-        {status === "no-session" && (
-          <>
-            <h2
-              style={{ fontSize: "18px", margin: "0 0 8px", color: "#141414" }}
-            >
-              Sign in to Wantio
-            </h2>
-            <p
-              style={{ fontSize: "14px", color: "#6b6b6b", margin: "0 0 16px" }}
-            >
-              Connect your account to use the Chrome extension.
-            </p>
-            <button
-              onClick={handleLogin}
-              style={{
-                width: "100%",
-                padding: "10px 16px",
-                background: "#121212",
-                color: "white",
-                border: "none",
-                borderRadius: "10px",
-                fontSize: "14px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              Sign in with Google
-            </button>
-          </>
-        )}
-
-        {status === "missing" && (
-          <p>Install or enable the Wantio extension, then reload this page.</p>
-        )}
-        {status === "sending" && (
-          <>
-            <h2
-              style={{ fontSize: "18px", margin: "0 0 8px", color: "#141414" }}
-            >
-              Connecting...
-            </h2>
-            <p style={{ fontSize: "14px", color: "#6b6b6b", margin: 0 }}>
-              Sending your session to the extension
-            </p>
-          </>
-        )}
-
-        {status === "success" && (
-          <>
-            <h2
-              style={{ fontSize: "18px", margin: "0 0 8px", color: "#16a34a" }}
-            >
-              ✓ Connected!
-            </h2>
-            <p style={{ fontSize: "14px", color: "#6b6b6b", margin: 0 }}>
-              You can close this tab and use the extension now.
-            </p>
-          </>
-        )}
-      </div>
+          )}
+          {status === "success" && (
+            <>
+              <div className="mt-8 space-y-4 text-sm">
+                <p className="flex items-center gap-3">
+                  <ShoppingBag size={18} className="text-muted-foreground" />
+                  Open a product you like.
+                </p>
+                <p className="flex items-center gap-3">
+                  <MousePointer2 size={18} className="text-muted-foreground" />
+                  Click Wantio in your extensions.
+                </p>
+              </div>
+              <Button asChild className="mt-8 w-full">
+                <Link href="/">
+                  Open my wishlist <ArrowUpRight size={16} />
+                </Link>
+              </Button>
+            </>
+          )}
+          {status === "no-session" && (
+            <>
+              <Button
+                className="mt-8 w-full"
+                disabled={opening}
+                onClick={login}
+              >
+                {opening ? "Opening Google…" : "Continue with Google"}
+                <ArrowUpRight size={16} />
+              </Button>
+              <p className="text-xs text-muted-foreground mt-4">
+                Connect in the same Chrome profile where you installed Wantio.
+              </p>
+            </>
+          )}
+          {status === "missing" && (
+            <div className="mt-8 flex flex-col gap-3">
+              <Button asChild>
+                <Link href="/extension">
+                  Install or update Wantio <ArrowUpRight size={16} />
+                </Link>
+              </Button>
+              <Button variant="outline" onClick={() => location.reload()}>
+                Try connecting again
+              </Button>
+            </div>
+          )}
+        </section>
+      </main>
+      <footer className="px-6 pb-6 text-center text-xs text-muted-foreground">
+        <Link className="underline underline-offset-4" href="/privacy">
+          Privacy
+        </Link>
+        <span className="mx-3">·</span>Saved for you, shared only when you
+        choose.
+      </footer>
     </div>
   );
 }

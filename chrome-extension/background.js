@@ -1,95 +1,120 @@
-// Wantio: session refresh lives in the worker, not in short-lived popups.
-const WANTIO_URL = "https://wantio.app";
-const TOKEN_KEY = "wantio_session";
-let refreshing = null;
-let config = null;
+import {
+  fetchJson,
+  ExtensionError,
+  createAuthorizedRequest,
+} from "./lib/network.js";
+import { createSessionStore } from "./lib/session.js";
+import { createDraftStore } from "./lib/drafts.js";
+const APP_URL = "https://wantio.app";
+let configPromise;
 async function getConfig() {
-  if (config) return config;
-  const res = await fetch(`${WANTIO_URL}/api/config`);
-  if (!res.ok) throw new Error("Wantio is unavailable. Try again.");
-  config = await res.json();
-  return config;
-}
-function expiry(token) {
-  try {
-    return JSON.parse(
-      atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")),
-    ).exp;
-  } catch {
-    return 0;
-  }
-}
-async function storeSession(data) {
-  if (!data.access_token || !data.refresh_token)
-    throw new Error("Invalid session.");
-  const session = {
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
-    expires_at: data.expires_at || expiry(data.access_token),
-  };
-  await chrome.storage.local.set({ [TOKEN_KEY]: session });
-  return session;
-}
-async function refresh(session) {
-  const c = await getConfig();
-  const res = await fetch(
-    `${c.supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: c.supabaseAnonKey,
-      },
-      body: JSON.stringify({ refresh_token: session.refresh_token }),
-    },
-  );
-  if (!res.ok) {
-    if (res.status === 400 || res.status === 401)
-      await chrome.storage.local.remove(TOKEN_KEY);
-    throw new Error("Sign in to Wantio again.");
-  }
-  return storeSession(await res.json());
-}
-async function getSession(force = false) {
-  const stored = await chrome.storage.local.get(TOKEN_KEY);
-  const session = stored[TOKEN_KEY];
-  if (!session) return null;
-  if (
-    force ||
-    !session.expires_at ||
-    Date.now() / 1000 >= session.expires_at - 60
-  ) {
-    if (!refreshing)
-      refreshing = refresh(session).finally(() => {
-        refreshing = null;
+  if (!configPromise)
+    configPromise = fetchJson(`${APP_URL}/api/config`)
+      .then((data) => {
+        if (
+          data.supabaseUrl !== "https://zfrdcuztrujsmrsnppes.supabase.co" ||
+          !data.supabaseAnonKey
+        )
+          throw new ExtensionError(
+            "Wantio connection settings are unavailable. Try again.",
+          );
+        return { ...data, url: APP_URL };
+      })
+      .catch((error) => {
+        configPromise = null;
+        throw error;
       });
-    return refreshing;
+  return configPromise;
+}
+const sessions = createSessionStore(chrome.storage.local, getConfig, fetchJson);
+const drafts = createDraftStore(chrome.storage.local);
+const authorized = createAuthorizedRequest(sessions.get, getConfig);
+const saves = new Map();
+async function draftKey(url) {
+  const session = await sessions.get();
+  if (!session)
+    throw new ExtensionError("Connect your account to continue.", "auth");
+  const payload = JSON.parse(
+    atob(
+      session.access_token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"),
+    ),
+  );
+  if (!payload.sub)
+    throw new ExtensionError("Connect your account again.", "auth");
+  return `${payload.sub}:${url}`;
+}
+async function handle(message, sender) {
+  if (message.type === "AUTH_TOKEN") {
+    const page = sender.tab?.url && new URL(sender.tab.url);
+    if (!page || page.origin !== APP_URL || page.pathname !== "/auth/extension")
+      throw new ExtensionError("Unexpected sign-in page.", "auth");
+    await sessions.connect(message);
+    return { ok: true, version: chrome.runtime.getManifest().version };
   }
-  return session;
+  // Only extension pages may read credentials, make API calls, or manage drafts.
+  if (!sender.url?.startsWith(chrome.runtime.getURL("")))
+    throw new ExtensionError("This request is not supported.");
+  switch (message.type) {
+    case "GET_CONFIG":
+      return getConfig();
+    case "GET_SESSION":
+      return sessions.get(message.force === true);
+    case "GET_TAGS":
+      return authorized(
+        "/rest/v1/tags?select=id,name,color&order=name",
+        {},
+        true,
+      );
+    case "GET_DRAFT":
+      return drafts.get(await draftKey(message.url));
+    case "SAVE_DRAFT":
+      await drafts.put(await draftKey(message.url), message.item);
+      return { ok: true };
+    case "CLEAR_DRAFT":
+      await drafts.remove(await draftKey(message.url));
+      return { ok: true };
+    case "SCRAPE":
+      return authorized("/api/scrape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: message.url,
+          existingTags: message.tags || [],
+        }),
+      });
+    case "SAVE_ITEM": {
+      const item = message.item;
+      if (!item?.id || !item.name?.trim())
+        throw new ExtensionError("Give this item a name.", "validation");
+      if (!saves.has(item.id)) {
+        const task = (async () => {
+          const key = await draftKey(message.url || item.url);
+          await drafts.put(key, item);
+          const result = await authorized("/api/items", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item),
+          });
+          await drafts.complete(key, item);
+          return result;
+        })();
+        saves.set(item.id, task);
+        task.finally(() => saves.delete(item.id)).catch(() => {});
+      }
+      return saves.get(item.id);
+    }
+    case "LOGOUT":
+      await sessions.logout();
+      return { ok: true };
+    default:
+      throw new ExtensionError("Update the extension and try again.");
+  }
 }
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
-  const task = async () => {
-    if (message.type === "GET_SESSION")
-      return getSession(message.force === true);
-    if (message.type === "GET_CONFIG")
-      return { ...(await getConfig()), url: WANTIO_URL };
-    if (message.type === "AUTH_TOKEN") {
-      if (
-        !sender.tab?.url ||
-        !sender.tab.url.startsWith(`${WANTIO_URL}/auth/extension`)
-      )
-        throw new Error("Unexpected sign-in page.");
-      await storeSession(message);
-      return { ok: true };
-    }
-    if (message.type === "LOGOUT") {
-      await chrome.storage.local.remove(TOKEN_KEY);
-      return { ok: true };
-    }
-    throw new Error("Unknown request.");
-  };
-  task()
+  handle(message, sender)
     .then(reply)
-    .catch((error) => reply({ error: error.message }));
+    .catch((error) =>
+      reply({ error: error.message, code: error.code || "unknown" }),
+    );
   return true;
 });

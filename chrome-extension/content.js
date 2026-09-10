@@ -173,5 +173,28 @@
     }
   }
 
+  const imageCandidates = [
+    result.image_url,
+    ...Array.from(document.images)
+      .filter((img) => img.naturalWidth >= 120 && img.naturalHeight >= 120)
+      .map((img) => img.currentSrc || img.src),
+  ];
+  result.images = [
+    ...new Set(
+      imageCandidates
+        .filter(Boolean)
+        .map((value) => {
+          try {
+            const url = new URL(value, location.href);
+            return ["http:", "https:"].includes(url.protocol) ? url.href : null;
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean),
+    ),
+  ].slice(0, 16);
+  if (result.image_url && !/^https?:\/\//i.test(result.image_url))
+    result.image_url = null;
   return result;
 })();
