@@ -33,7 +33,7 @@ test("public pages, small screen, and unauthenticated API protection", async ({
     ).status(),
   ).toBe(401);
   await page.goto("/shared/not-a-uuid");
-  await expect(page.getByText("404",{exact:true})).toBeVisible();
+  await expect(page.getByText("404", { exact: true })).toBeVisible();
 });
 
 test("save, edit, purchase, restore, share privately, and delete", async ({
@@ -81,29 +81,48 @@ test("save, edit, purchase, restore, share privately, and delete", async ({
     });
     const login = await auth.auth.signInWithPassword({ email, password });
     if (login.error) throw login.error;
-    const apiId=crypto.randomUUID();
-    for(let retry=0;retry<2;retry++) {
-      const response=await page.request.post('/api/items',{headers:{Authorization:`Bearer ${login.data.session!.access_token}`},data:{id:apiId,name:'Extension API test',currency:'EUR',current_price:0}});
+    const apiId = crypto.randomUUID();
+    for (let retry = 0; retry < 2; retry++) {
+      const response = await page.request.post("/api/items", {
+        headers: {
+          Authorization: `Bearer ${login.data.session!.access_token}`,
+        },
+        data: {
+          id: apiId,
+          name: "Extension API test",
+          currency: "EUR",
+          current_price: 0,
+        },
+      });
       expect(response.status()).toBe(201);
     }
-    const {data:saved}=await auth.from('wishlist_items').select('id').eq('id',apiId);
+    const { data: saved } = await auth
+      .from("wishlist_items")
+      .select("id")
+      .eq("id", apiId);
     expect(saved).toHaveLength(1);
-    await auth.from('wishlist_items').delete().eq('id',apiId);
+    await auth.from("wishlist_items").delete().eq("id", apiId);
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await expect(
       page.getByRole("heading", { name: /Your wishlist/ }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page
+      .getByRole("link", { name: "Settings", exact: true })
+      .filter({ visible: true })
+      .click();
     await page.getByLabel("New tag").fill("Home");
     await page.getByRole("button", { name: "Add", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "Delete tag Home" }),
     ).toBeVisible();
-    await page.getByRole("button", { name: "Wishlist", exact: true }).click();
+    await page
+      .getByRole("link", { name: "Wishlist", exact: true })
+      .filter({ visible: true })
+      .click();
     await page
       .getByRole("button", { name: "Add item", exact: true })
-      .first()
+      .filter({ visible: true })
       .click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Product name").fill("Test chair");
@@ -116,10 +135,16 @@ test("save, edit, purchase, restore, share privately, and delete", async ({
     await expect(
       page.getByRole("button", { name: "View Test chair" }),
     ).toBeVisible();
-    await page.screenshot({path:'test-results/wantio-mobile.png',fullPage:true});
-    await page.setViewportSize({width:1440,height:1000});
-    await page.screenshot({path:'test-results/wantio-desktop.png',fullPage:true});
-    await page.setViewportSize({width:390,height:844});
+    await page.screenshot({
+      path: "test-results/wantio-mobile.png",
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    await page.screenshot({
+      path: "test-results/wantio-desktop.png",
+      fullPage: true,
+    });
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.getByRole("button", { name: "View Test chair" }).click();
     await dialog.getByRole("button", { name: "Edit item" }).click();
     await dialog.getByLabel("Product name").fill("Edited chair");
@@ -134,12 +159,18 @@ test("save, edit, purchase, restore, share privately, and delete", async ({
     await expect(
       page.getByRole("button", { name: "View Edited chair" }),
     ).toHaveCount(0);
-    await page.getByRole("button", { name: "Purchased", exact: true }).click();
+    await page
+      .getByRole("link", { name: "Purchased", exact: true })
+      .filter({ visible: true })
+      .click();
     await expect(page.getByText("Spent · PLN")).toBeVisible();
     await page.getByRole("button", { name: "View Edited chair" }).click();
     await dialog.getByRole("button", { name: "Move back to wishlist" }).click();
     await expect(dialog).toBeHidden();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await page
+      .getByRole("link", { name: "Settings", exact: true })
+      .filter({ visible: true })
+      .click();
     await page.getByLabel("Allow viewing with a link").check();
     await expect(page.getByLabel("Allow viewing with a link")).toBeEnabled();
     const link = await page.getByLabel("Wishlist share link").inputValue();
@@ -152,13 +183,16 @@ test("save, edit, purchase, restore, share privately, and delete", async ({
       ).toBeVisible();
       await expect(guestPage.getByText("Only I can see this")).toHaveCount(0);
       await page.getByLabel("Allow viewing with a link").uncheck();
-    await expect(page.getByLabel("Allow viewing with a link")).toBeEnabled();
+      await expect(page.getByLabel("Allow viewing with a link")).toBeEnabled();
       await guestPage.reload();
       await expect(guestPage.getByText("404", { exact: true })).toBeVisible();
     } finally {
       await guest.close();
     }
-    await page.getByRole("button", { name: "Wishlist", exact: true }).click();
+    await page
+      .getByRole("link", { name: "Wishlist", exact: true })
+      .filter({ visible: true })
+      .click();
     await page.getByRole("button", { name: "View Edited chair" }).click();
     page.once("dialog", (d) => d.accept());
     await dialog

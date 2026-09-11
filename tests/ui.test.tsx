@@ -21,6 +21,9 @@ vi.mock("@/lib/actions", () => ({
   deleteTag: vi.fn(),
   updateProfile: vi.fn(),
 }));
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
 vi.mock("next-themes", () => ({
   useTheme: () => ({ theme: "light", setTheme: vi.fn() }),
 }));
@@ -124,5 +127,5 @@ it("exposes card details and navigation through named buttons", () => {
     <WishlistDashboard initialItems={[item]} initialTags={[]} profile={null} />,
   );
   expect(screen.getByRole("button", { name: "View First item" })).toBeTruthy();
-  expect(screen.getByRole("button", { name: "Settings" })).toBeTruthy();
+  expect(screen.getAllByRole("link", { name: "Settings" })[0]).toBeTruthy();
 });

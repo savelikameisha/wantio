@@ -1,10 +1,12 @@
 "use client";
-import Link from "next/link";
-import { useState, useTransition } from "react";
-import { Heart, Plus } from "lucide-react";
+
+import { useRef, useState, useTransition } from "react";
+import { Heart, Plus, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { FloatingNav } from "@/components/floating-nav";
+import { WorkspaceNav } from "@/components/workspace-nav";
+import { TagFilters } from "@/components/tag-filters";
+import { useWorkspaceNavigation } from "@/hooks/use-workspace-navigation";
 import { ProductCard } from "@/components/product-card";
 import { AddItemModal } from "@/components/add-item-modal";
 import { PurchasedView } from "@/components/purchased-view";
@@ -13,7 +15,7 @@ import { BottomSheet } from "@/components/bottom-sheet";
 import { ItemDetailSheet } from "@/components/item-detail-sheet";
 import { markPurchased, deleteItem, restoreItem } from "@/lib/actions";
 import { errorMessage } from "@/lib/validation";
-import { ViewMode, WishlistItem, Tag, Profile } from "@/types";
+import { WishlistItem, Tag, Profile } from "@/types";
 export function WishlistDashboard({
   initialItems,
   initialTags,
@@ -23,11 +25,20 @@ export function WishlistDashboard({
   initialTags: Tag[];
   profile: Profile | null;
 }) {
-  const [activeView, setActiveView] = useState<ViewMode>("wishlist");
+  const navigation = useWorkspaceNavigation();
+  const { view: activeView, search, itemId: detailId } = navigation;
+  const filter = initialTags.some((t) => t.id === navigation.tag)
+    ? navigation.tag
+    : "";
+  const itemTrigger = useRef<HTMLElement | null>(null);
+  function openDetail(item: WishlistItem) {
+    itemTrigger.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    navigation.openItem(item.id);
+  }
   const [modal, setModal] = useState<{ item?: WishlistItem } | null>(null);
-  const [detailId, setDetailId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("");
   const [error, setError] = useState("");
   const [pending, startTransition] = useTransition();
   const [limit, setLimit] = useState(48);
@@ -50,7 +61,7 @@ export function WishlistDashboard({
     startTransition(async () => {
       try {
         await action();
-        setDetailId(null);
+        navigation.closeItem(true);
       } catch (e) {
         setError(errorMessage(e));
       }
@@ -65,52 +76,36 @@ export function WishlistDashboard({
       <a href="#main" className="sr-only focus:not-sr-only focus:block p-3">
         Skip to content
       </a>
-      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur border-b border-border/50">
-        <div className="max-w-6xl mx-auto px-4 py-4 grid grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
-          <Link
-            href="/"
-            className="col-span-2 sm:col-span-1 flex items-center gap-2 min-h-11 font-semibold text-lg"
+      <header className="sticky top-0 z-30 border-b border-border/60 bg-background/95 backdrop-blur">
+        <div className="mx-auto flex h-[76px] max-w-6xl items-center justify-between gap-4 px-4">
+          <a
+            href={navigation.hrefFor("wishlist")}
+            onClick={(e) => {
+              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+              e.preventDefault();
+              navigation.changeView("wishlist");
+            }}
+            className="flex min-h-11 shrink-0 items-center gap-2 text-lg font-semibold"
           >
             <img src="/icon.svg" alt="" className="h-8 w-8" />
             Wantio
-          </Link>
-          {activeView === "wishlist" && (
-            <>
-              <label className="min-w-0">
-                <span className="sr-only">Search wishlist</span>
-                <Input
-                  type="search"
-                  placeholder="Search your wishlist"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setLimit(48);
-                  }}
-                />
-              </label>
-              <label>
-                <span className="sr-only">Filter by tag</span>
-                <select
-                  value={filter}
-                  onChange={(e) => {
-                    setFilter(e.target.value);
-                    setLimit(48);
-                  }}
-                  className="h-11 max-w-40 rounded-lg border bg-background px-3"
-                >
-                  <option value="">All tags</option>
-                  {initialTags.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </>
-          )}
+          </a>
+          <WorkspaceNav
+            activeView={activeView}
+            onNavigate={navigation.changeView}
+            hrefFor={navigation.hrefFor}
+            onAddItem={() => setModal({})}
+          />
+          <Button
+            className="hidden md:inline-flex"
+            onClick={() => setModal({})}
+          >
+            <Plus />
+            Add item
+          </Button>
         </div>
       </header>
-      <main id="main" className="max-w-6xl mx-auto px-4 py-6 pb-32">
+      <main id="main" className="max-w-6xl mx-auto px-4 py-6 pb-28 md:pb-10">
         {error && (
           <div
             role="alert"
@@ -126,17 +121,44 @@ export function WishlistDashboard({
         )}
         {activeView === "wishlist" && (
           <>
-            <div className="flex justify-between items-center mb-5">
-              <h1 className="text-xl font-semibold">
-                Your wishlist{" "}
-                <span className="text-muted-foreground text-sm">
-                  {active.length}
-                </span>
+            <div className="mb-4 flex items-baseline gap-3">
+              <h1 className="text-2xl font-semibold tracking-tight">
+                Your wishlist
               </h1>
-              <Button onClick={() => setModal({})}>
-                <Plus className="h-4 w-4" />
-                Add item
-              </Button>
+              <span
+                className="text-sm tabular-nums text-muted-foreground"
+                aria-live="polite"
+              >
+                {filtered.length}
+                {filter || search ? ` of ${active.length}` : ""} items
+              </span>
+            </div>
+            <div className="sticky top-[76px] z-20 -mx-4 mb-4 space-y-2 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur">
+              <label className="relative block max-w-md">
+                <span className="sr-only">Search wishlist</span>
+                <Search
+                  aria-hidden
+                  className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground"
+                />
+                <Input
+                  type="search"
+                  className="bg-card pl-10"
+                  placeholder="Search your wishlist"
+                  value={search}
+                  onChange={(e) => {
+                    navigation.searchFor(e.target.value);
+                    setLimit(48);
+                  }}
+                />
+              </label>
+              <TagFilters
+                tags={initialTags}
+                value={filter}
+                onChange={(id) => {
+                  navigation.filterBy(id);
+                  setLimit(48);
+                }}
+              />
             </div>
             {!filtered.length ? (
               <div className="text-center py-20">
@@ -156,8 +178,8 @@ export function WishlistDashboard({
                     variant="outline"
                     className="mt-4"
                     onClick={() => {
-                      setSearch("");
-                      setFilter("");
+                      navigation.clearFilters();
+                      setLimit(48);
                     }}
                   >
                     Clear filters
@@ -168,11 +190,7 @@ export function WishlistDashboard({
               <>
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
                   {filtered.slice(0, limit).map((item) => (
-                    <ProductCard
-                      key={item.id}
-                      item={item}
-                      onTap={(i) => setDetailId(i.id)}
-                    />
+                    <ProductCard key={item.id} item={item} onTap={openDetail} />
                   ))}
                 </div>
                 {filtered.length > limit && (
@@ -189,7 +207,7 @@ export function WishlistDashboard({
           </>
         )}
         {activeView === "purchased" && (
-          <PurchasedView items={purchased} onOpen={(i) => setDetailId(i.id)} />
+          <PurchasedView items={purchased} onOpen={openDetail} />
         )}
         {activeView === "settings" && (
           <SettingsView
@@ -199,9 +217,11 @@ export function WishlistDashboard({
           />
         )}
       </main>
-      <FloatingNav
+      <WorkspaceNav
+        mobile
         activeView={activeView}
-        onViewChange={setActiveView}
+        onNavigate={navigation.changeView}
+        hrefFor={navigation.hrefFor}
         onAddItem={() => setModal({})}
       />
       {modal && (
@@ -214,7 +234,14 @@ export function WishlistDashboard({
           defaultCurrency={profile?.currency || "USD"}
         />
       )}
-      <BottomSheet open={!!detail} onClose={() => setDetailId(null)}>
+      <BottomSheet
+        open={!!detail}
+        onClose={() => navigation.closeItem()}
+        onReturnFocus={() => {
+          if (itemTrigger.current?.isConnected)
+            itemTrigger.current.focus({ preventScroll: true });
+        }}
+      >
         {detail && error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
@@ -226,7 +253,7 @@ export function WishlistDashboard({
             item={detail}
             pending={pending}
             onEdit={(item) => {
-              setDetailId(null);
+              navigation.closeItem(true);
               setModal({ item });
             }}
             onMarkPurchased={(id, price) =>

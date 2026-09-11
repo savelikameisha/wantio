@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { TagFilters } from "@/components/tag-filters";
 import { ProductCard } from "@/components/product-card";
 import { BottomSheet } from "@/components/bottom-sheet";
 import { ItemDetailSheet } from "@/components/item-detail-sheet";
@@ -567,25 +568,19 @@ export function DesignLibrary() {
                 <TabsTrigger value="purchased">Purchased</TabsTrigger>
               </TabsList>
               <TabsContent value="wishlist">
-                <div
-                  className="my-5 flex flex-wrap gap-2"
-                  role="group"
-                  aria-label="Example label filters"
-                >
-                  {["all", "home", "books"].map((t) => (
-                    <Button
-                      key={t}
-                      variant={label === t ? "default" : "outline"}
-                      aria-pressed={label === t}
-                      onClick={() => setLabel(t)}
-                    >
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
-                    </Button>
-                  ))}
+                <div className="my-5">
+                  <TagFilters
+                    tags={[
+                      { id: "home", name: "Home", color: "#466BEA" },
+                      { id: "books", name: "Books", color: "#466BEA" },
+                    ]}
+                    value={label === "all" ? "" : label}
+                    onChange={(id) => setLabel(id || "all")}
+                  />
                 </div>
                 <p className="mb-5 text-xs text-muted-foreground">
-                  Visible label filters are a proposed navigation pattern
-                  (SAV-11).
+                  The same visible tag filters used in the wishlist. All resets
+                  the selection.
                 </p>
                 {label === "books" ? (
                   <div className="rounded-2xl border p-8">
@@ -695,7 +690,7 @@ export function DesignLibrary() {
                   "Neutral workspace, Geist, Lucide and shared controls",
                   "Current product",
                 ],
-                ["To refine", "Navigation and visible label filters", "SAV-11"],
+                ["In use", "Navigation and visible label filters", "SAV-11"],
                 [
                   "To refine",
                   "Desktop side panel and mobile full-screen item",
