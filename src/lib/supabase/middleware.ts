@@ -33,6 +33,23 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // Deny internal routes before streaming starts, including RSC requests.
+  if (
+    request.nextUrl.pathname === "/internal" ||
+    request.nextUrl.pathname.startsWith("/internal/")
+  ) {
+    const ownerId = process.env.WANTIO_ADMIN_USER_ID?.trim();
+    if (!ownerId || !user || user.id !== ownerId) {
+      return new NextResponse("Not found", {
+        status: 404,
+        headers: {
+          "Cache-Control": "private, no-store",
+          "X-Robots-Tag": "noindex",
+        },
+      });
+    }
+  }
+
   // Redirect unauthenticated users to login (except public routes)
   if (
     !user &&

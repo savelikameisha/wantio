@@ -14,7 +14,10 @@ export function ImageWithFallback({
   fallbackClassName?: string;
 }) {
   const [failed, setFailed] = useState<string | null>(null);
-  const valid = src && /^https?:\/\//i.test(src) && failed !== src;
+  const valid =
+    src &&
+    (/^https?:\/\//i.test(src) || /^\/(?!\/)/.test(src)) &&
+    failed !== src;
   return (
     <div
       className={cn(
