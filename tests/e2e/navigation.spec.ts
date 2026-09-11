@@ -90,7 +90,7 @@ test("navigation preserves filters, browser history and item focus on desktop an
     ])
       if (response.error) throw response.error;
     await page.reload();
-    for (const width of [1440, 390]) {
+    for (const width of [1440, 768, 390]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/");
       const nav = page.getByRole("navigation", {
@@ -103,6 +103,24 @@ test("navigation preserves filters, browser history and item focus on desktop an
           .getByRole("button", { name: "Add item", exact: true })
           .filter({ visible: true }),
       ).toHaveCount(1);
+      const allFilter = page.getByRole("button", { name: "All", exact: true });
+      await expect(allFilter).toContainText("24");
+      await expect(
+        page.getByRole("button", { name: "Books", exact: true }),
+      ).toContainText("2");
+      const logoBox = await page
+        .getByRole("link", { name: "Wantio home" })
+        .boundingBox();
+      const tagsBox = await allFilter.boundingBox();
+      if (width >= 768)
+        expect(
+          Math.abs(
+            logoBox!.y +
+              logoBox!.height / 2 -
+              (tagsBox!.y + tagsBox!.height / 2),
+          ),
+        ).toBeLessThan(3);
+      else expect(tagsBox!.y).toBeGreaterThan(logoBox!.y + logoBox!.height);
       await page.getByRole("button", { name: "Books", exact: true }).click();
       await expect(page.getByRole("button", { name: /^View / })).toHaveCount(2);
       await page
@@ -153,6 +171,25 @@ test("navigation preserves filters, browser history and item focus on desktop an
       expect(Math.abs((await page.evaluate(() => scrollY)) - y)).toBeLessThan(
         8,
       );
+      if (
+        await page.evaluate(
+          () => document.documentElement.scrollWidth > innerWidth,
+        )
+      )
+        console.log(
+          await page.evaluate(() => ({
+            width: innerWidth,
+            scroll: document.documentElement.scrollWidth,
+            overflow: Array.from(document.querySelectorAll("body *"))
+              .filter((e) => e.getBoundingClientRect().right > innerWidth + 1)
+              .slice(0, 12)
+              .map((e) => ({
+                tag: e.tagName,
+                cls: e.className,
+                right: e.getBoundingClientRect().right,
+              })),
+          })),
+        );
       expect(
         await page.evaluate(
           () => document.documentElement.scrollWidth <= innerWidth,

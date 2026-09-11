@@ -26,7 +26,7 @@ export function WorkspaceNav({
       className={cn(
         mobile
           ? "fixed inset-x-0 bottom-0 z-30 flex justify-around border-t bg-background/95 px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden"
-          : "hidden items-center gap-1 md:flex",
+          : "hidden shrink-0 items-center gap-1 md:flex",
       )}
     >
       {views.map(({ id, name, icon: Icon }) => (
@@ -55,7 +55,7 @@ export function WorkspaceNav({
           )}
         >
           <Icon className="h-4 w-4" aria-hidden />
-          {name}
+          <span className={mobile ? "" : "sr-only xl:not-sr-only"}>{name}</span>
         </a>
       ))}
       {mobile && (

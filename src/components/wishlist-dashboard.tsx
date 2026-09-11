@@ -47,12 +47,19 @@ export function WishlistDashboard({
   const purchased = initialItems.filter(
     (i) => i.is_purchased && !i.is_archived,
   );
-  const filtered = active.filter(
-    (i) =>
-      (!filter || i.tags.some((t) => t.id === filter)) &&
-      [i.name, i.store, ...i.tags.map((t) => t.name)].some((v) =>
-        v?.toLowerCase().includes(search.toLowerCase()),
-      ),
+  const matching = active.filter((i) =>
+    [i.name, i.store, ...i.tags.map((t) => t.name)].some((v) =>
+      v?.toLowerCase().includes(search.toLowerCase()),
+    ),
+  );
+  const filtered = matching.filter(
+    (i) => !filter || i.tags.some((t) => t.id === filter),
+  );
+  const tagCounts = Object.fromEntries(
+    initialTags.map((t) => [
+      t.id,
+      matching.filter((i) => i.tags.some((tag) => tag.id === t.id)).length,
+    ]),
   );
   const detail = initialItems.find((i) => i.id === detailId);
   function mutate(action: () => Promise<void>) {
@@ -77,7 +84,13 @@ export function WishlistDashboard({
         Skip to content
       </a>
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-[76px] max-w-6xl items-center justify-between gap-4 px-4">
+        <div
+          className={
+            activeView === "wishlist"
+              ? "mx-auto grid max-w-7xl grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 px-4 py-3 md:grid-cols-[auto_auto_minmax(100px,160px)_minmax(100px,1fr)_auto]"
+              : "mx-auto flex max-w-7xl items-center gap-3 px-4 py-3"
+          }
+        >
           <a
             href={navigation.hrefFor("wishlist")}
             onClick={(e) => {
@@ -85,10 +98,10 @@ export function WishlistDashboard({
               e.preventDefault();
               navigation.changeView("wishlist");
             }}
-            className="flex min-h-11 shrink-0 items-center gap-2 text-lg font-semibold"
+            aria-label="Wantio home"
+            className="flex h-11 w-11 shrink-0 items-center justify-center"
           >
             <img src="/icon.svg" alt="" className="h-8 w-8" />
-            Wantio
           </a>
           <WorkspaceNav
             activeView={activeView}
@@ -96,12 +109,46 @@ export function WishlistDashboard({
             hrefFor={navigation.hrefFor}
             onAddItem={() => setModal({})}
           />
+          {activeView === "wishlist" && (
+            <>
+              <label className="relative block min-w-0">
+                <span className="sr-only">Search wishlist</span>
+                <Search
+                  aria-hidden
+                  className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground"
+                />
+                <Input
+                  type="search"
+                  className="border-transparent bg-muted/60 pl-10 shadow-none"
+                  placeholder="Search"
+                  value={search}
+                  onChange={(e) => {
+                    navigation.searchFor(e.target.value);
+                    setLimit(48);
+                  }}
+                />
+              </label>
+              <div className="col-span-2 min-w-0 pt-1 md:col-span-1 md:pt-0">
+                <TagFilters
+                  tags={initialTags}
+                  value={filter}
+                  counts={tagCounts}
+                  allCount={matching.length}
+                  onChange={(id) => {
+                    navigation.filterBy(id);
+                    setLimit(48);
+                  }}
+                />
+              </div>
+            </>
+          )}
           <Button
-            className="hidden md:inline-flex"
+            className="ml-auto hidden md:inline-flex"
             onClick={() => setModal({})}
+            aria-label="Add item"
           >
             <Plus />
-            Add item
+            <span className="hidden xl:inline">Add item</span>
           </Button>
         </div>
       </header>
@@ -121,45 +168,10 @@ export function WishlistDashboard({
         )}
         {activeView === "wishlist" && (
           <>
-            <div className="mb-4 flex items-baseline gap-3">
-              <h1 className="text-2xl font-semibold tracking-tight">
-                Your wishlist
-              </h1>
-              <span
-                className="text-sm tabular-nums text-muted-foreground"
-                aria-live="polite"
-              >
-                {filtered.length}
-                {filter || search ? ` of ${active.length}` : ""} items
-              </span>
-            </div>
-            <div className="sticky top-[76px] z-20 -mx-4 mb-4 space-y-2 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur">
-              <label className="relative block max-w-md">
-                <span className="sr-only">Search wishlist</span>
-                <Search
-                  aria-hidden
-                  className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground"
-                />
-                <Input
-                  type="search"
-                  className="bg-card pl-10"
-                  placeholder="Search your wishlist"
-                  value={search}
-                  onChange={(e) => {
-                    navigation.searchFor(e.target.value);
-                    setLimit(48);
-                  }}
-                />
-              </label>
-              <TagFilters
-                tags={initialTags}
-                value={filter}
-                onChange={(id) => {
-                  navigation.filterBy(id);
-                  setLimit(48);
-                }}
-              />
-            </div>
+            <h1 className="sr-only">Your wishlist</h1>
+            <p className="sr-only" aria-live="polite">
+              {filtered.length} items
+            </p>
             {!filtered.length ? (
               <div className="text-center py-20">
                 <Heart className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />

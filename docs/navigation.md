@@ -1,9 +1,12 @@
 # Workspace navigation (SAV-11)
 
-The global header identifies Wantio. Desktop navigation lives in that header;
+The global header uses the Wantio mark without a repeated wordmark. On desktop,
+navigation, search, tag filters and Add item share one row;
 mobile navigation lives at the bottom with persistent labels. Only one Add item
-control is visible at a time. Each view has one page title. Search and visible
-tag buttons form a sticky wishlist toolbar, independent of the product grid.
+control is visible at a time. The wishlist title is available to assistive technology without a visible duplicate
+heading. On mobile, search shares the logo row and tags occupy a second row.
+All remains fixed while the other tags scroll. Item counts live inside the tags
+and reflect the current search.
 
 All is the default, one tag can be selected at a time, and tag selection combines
 with search. The row scrolls horizontally without widening the page, including

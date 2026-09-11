@@ -574,6 +574,8 @@ export function DesignLibrary() {
                       { id: "home", name: "Home", color: "#466BEA" },
                       { id: "books", name: "Books", color: "#466BEA" },
                     ]}
+                    allCount={1}
+                    counts={{ home: 1, books: 0 }}
                     value={label === "all" ? "" : label}
                     onChange={(id) => setLabel(id || "all")}
                   />
