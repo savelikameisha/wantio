@@ -114,8 +114,7 @@ test("save, edit, purchase, restore, share privately, and delete", async ({
     await expect(
       page.getByRole("button", { name: "Delete tag Home" }),
     ).toBeVisible();
-    await page.getByRole("combobox", { name: "Choose list" }).click();
-    await page.getByRole("option", { name: "Wishlist", exact: true }).click();
+    await page.getByRole("link", { name: "Wantio home" }).click();
     await page
       .getByRole("button", { name: "Add item", exact: true })
       .filter({ visible: true })
@@ -155,8 +154,8 @@ test("save, edit, purchase, restore, share privately, and delete", async ({
     await expect(
       page.getByRole("button", { name: "View Edited chair" }),
     ).toHaveCount(0);
-    await page.getByRole("combobox", { name: "Choose list" }).click();
-    await page.getByRole("option", { name: "Purchased", exact: true }).click();
+    await page.locator('summary[aria-label="More options"]').click();
+    await page.getByRole("button", { name: "Purchased", exact: true }).click();
     await expect(page.getByText("Spent · PLN")).toBeVisible();
     await page.getByRole("button", { name: "View Edited chair" }).click();
     await dialog.getByRole("button", { name: "Move back to wishlist" }).click();
@@ -181,8 +180,7 @@ test("save, edit, purchase, restore, share privately, and delete", async ({
     } finally {
       await guest.close();
     }
-    await page.getByRole("combobox", { name: "Choose list" }).click();
-    await page.getByRole("option", { name: "Wishlist", exact: true }).click();
+    await page.getByRole("link", { name: "Wantio home" }).click();
     await page.getByRole("button", { name: "View Edited chair" }).click();
     page.once("dialog", (d) => d.accept());
     await dialog

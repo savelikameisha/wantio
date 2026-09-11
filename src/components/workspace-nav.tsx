@@ -1,44 +1,15 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { MoreHorizontal } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { ViewMode } from "@/types";
-export function WorkspaceNav({
+
+export function WorkspaceMenu({
   activeView,
   onNavigate,
 }: {
   activeView: ViewMode;
   onNavigate: (view: ViewMode) => void;
 }) {
-  return (
-    <Select
-      value={activeView === "settings" ? "" : activeView}
-      onValueChange={(v) => onNavigate(v as ViewMode)}
-    >
-      <SelectTrigger
-        aria-label="Choose list"
-        className="h-11 w-auto min-w-28 gap-2 border-0 bg-transparent px-2 shadow-none"
-      >
-        <SelectValue placeholder="Settings" />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="wishlist" className="min-h-11">
-          Wishlist
-        </SelectItem>
-        <SelectItem value="purchased" className="min-h-11">
-          Purchased
-        </SelectItem>
-      </SelectContent>
-    </Select>
-  );
-}
-export function WorkspaceMenu({ onSettings }: { onSettings: () => void }) {
   const ref = useRef<HTMLDetailsElement>(null);
   useEffect(() => {
     function outside(e: PointerEvent) {
@@ -64,16 +35,25 @@ export function WorkspaceMenu({ onSettings }: { onSettings: () => void }) {
     <details ref={ref} className="relative shrink-0">
       <summary
         aria-label="More options"
-        className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-xl hover:bg-muted [&::-webkit-details-marker]:hidden"
+        className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden"
       >
-        <MoreHorizontal className="h-5 w-5" />
+        <MoreHorizontal className="h-[18px] w-[18px]" />
       </summary>
       <div className="absolute right-0 top-full z-40 mt-2 w-52 rounded-xl border bg-popover p-1.5 shadow-lg">
         <button
           className={row}
           onClick={() => {
             if (ref.current) ref.current.open = false;
-            onSettings();
+            onNavigate(activeView === "wishlist" ? "purchased" : "wishlist");
+          }}
+        >
+          {activeView === "wishlist" ? "Purchased" : "Wishlist"}
+        </button>
+        <button
+          className={row}
+          onClick={() => {
+            if (ref.current) ref.current.open = false;
+            onNavigate("settings");
           }}
         >
           Settings

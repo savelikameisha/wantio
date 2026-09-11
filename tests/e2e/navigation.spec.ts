@@ -94,13 +94,28 @@ test("navigation preserves filters, browser history and item focus on desktop an
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/");
       await expect(
-        page.getByRole("combobox", { name: "Choose list" }),
+        page.getByRole("link", { name: "Wantio home" }),
       ).toBeVisible();
       await expect(
         page
           .getByRole("button", { name: "Add item", exact: true })
           .filter({ visible: true }),
       ).toHaveCount(1);
+      const alignment = await page.evaluate(() => {
+        const header = document
+          .querySelector("header > div")!
+          .getBoundingClientRect();
+        const main = document.querySelector("#main")!.getBoundingClientRect();
+        return {
+          left: Math.abs(header.left - main.left),
+          right: Math.abs(header.right - main.right),
+        };
+      });
+      expect(alignment.left).toBeLessThan(1);
+      expect(alignment.right).toBeLessThan(1);
+      await expect(
+        page.getByRole("combobox", { name: "Choose list" }),
+      ).toHaveCount(0);
       const more = page.locator('summary[aria-label="More options"]');
       await more.focus();
       await page.keyboard.press("Enter");

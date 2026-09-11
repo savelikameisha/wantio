@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { Heart, Plus, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { WorkspaceNav, WorkspaceMenu } from "@/components/workspace-nav";
+import { WorkspaceMenu } from "@/components/workspace-nav";
 import { TagFilters } from "@/components/tag-filters";
 import { useWorkspaceNavigation } from "@/hooks/use-workspace-navigation";
 import { ProductCard } from "@/components/product-card";
@@ -16,6 +16,8 @@ import { ItemDetailSheet } from "@/components/item-detail-sheet";
 import { markPurchased, deleteItem, restoreItem } from "@/lib/actions";
 import { errorMessage } from "@/lib/validation";
 import { WishlistItem, Tag, Profile } from "@/types";
+const workspaceContainer = "mx-auto w-full max-w-6xl px-4";
+
 export function WishlistDashboard({
   initialItems,
   initialTags,
@@ -87,7 +89,9 @@ export function WishlistDashboard({
         Skip to content
       </a>
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-1 px-3 py-3 md:flex-nowrap md:gap-2">
+        <div
+          className={`${workspaceContainer} flex flex-wrap items-center gap-2 py-3 md:flex-nowrap md:gap-3`}
+        >
           <a
             href={navigation.hrefFor("wishlist")}
             onClick={(e) => {
@@ -100,12 +104,6 @@ export function WishlistDashboard({
           >
             <img src="/icon.svg" alt="" className="h-8 w-8" />
           </a>
-          <div className={expandedSearch ? "hidden md:block" : "block"}>
-            <WorkspaceNav
-              activeView={activeView}
-              onNavigate={navigation.changeView}
-            />
-          </div>
           {activeView === "wishlist" && (
             <div className="order-2 w-full min-w-0 md:order-none md:w-auto md:flex-1">
               <TagFilters
@@ -155,11 +153,11 @@ export function WishlistDashboard({
               </Button>
             </div>
           )}
-          <div className="ml-auto flex items-center gap-1">
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             {activeView === "wishlist" && (
               <Button
                 ref={searchTrigger}
-                className={expandedSearch ? "hidden" : undefined}
+                className={`${expandedSearch ? "hidden" : ""} rounded-full text-muted-foreground hover:text-foreground [&_svg]:size-[18px]`}
                 variant="ghost"
                 size="icon"
                 aria-label="Open search"
@@ -174,20 +172,22 @@ export function WishlistDashboard({
                 <Search />
               </Button>
             )}
+            <WorkspaceMenu
+              activeView={activeView}
+              onNavigate={navigation.changeView}
+            />
             <Button
-              size="icon"
+              className="ml-2 rounded-full px-3.5 shadow-none [&_svg]:size-[18px]"
               aria-label="Add item"
               onClick={() => setModal({})}
             >
               <Plus />
+              <span className="hidden sm:inline">Add item</span>
             </Button>
-            <WorkspaceMenu
-              onSettings={() => navigation.changeView("settings")}
-            />
           </div>
         </div>
       </header>
-      <main id="main" className="max-w-6xl mx-auto px-4 py-6 pb-10">
+      <main id="main" className={`${workspaceContainer} py-6 pb-10`}>
         {error && (
           <div
             role="alert"

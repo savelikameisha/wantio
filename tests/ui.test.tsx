@@ -127,5 +127,5 @@ it("exposes card details and navigation through named buttons", () => {
     <WishlistDashboard initialItems={[item]} initialTags={[]} profile={null} />,
   );
   expect(screen.getByRole("button", { name: "View First item" })).toBeTruthy();
-  expect(screen.getByRole("combobox", { name: "Choose list" })).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Wantio home" })).toBeTruthy();
 });

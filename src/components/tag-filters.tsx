@@ -21,7 +21,7 @@ export function TagFilters({
       "relative inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-sm font-medium transition-colors",
       selected
         ? "border-primary bg-primary text-primary-foreground"
-        : "border-transparent bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+        : "border-border/70 bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
     );
   function count(n: number | undefined, id: string) {
     return n === undefined ? null : (

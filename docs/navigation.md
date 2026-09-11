@@ -1,10 +1,11 @@
 # Workspace navigation (SAV-11)
 
-The header uses the Wantio mark, a Wishlist/Purchased list selector, tag filters,
-an expandable search, one Add item button and a More options disclosure. Settings,
+The header uses the Wantio mark, tag filters,
+an expandable search, one Add item button and a More options disclosure. Purchased, Settings,
 extension help and sign out live in that disclosure. There is no bottom navigation.
+Header and content use the same width and horizontal padding. Search and More are quiet circular controls, followed by the primary Add item action. The logo returns to Wishlist; other views also expose Wishlist in the menu.
 Desktop controls share one row; mobile tags occupy a second row. On mobile an open
-search takes the place of the logo/list selector to make room for typing. Search
+search takes the place of the logo to make room for typing. Search
 stays expanded while a query exists; clear/close restores focus to its trigger.
 Escape closes an empty search. The More options disclosure closes on Escape or
 outside pointer interaction. Sign out uses the existing POST endpoint.
