@@ -1,11 +1,16 @@
 # Workspace navigation (SAV-11)
 
-The global header uses the Wantio mark without a repeated wordmark. On desktop,
-navigation, search, tag filters and Add item share one row;
-mobile navigation lives at the bottom with persistent labels. Only one Add item
-control is visible at a time. The wishlist title is available to assistive technology without a visible duplicate
-heading. On mobile, search shares the logo row and tags occupy a second row.
-All remains fixed while the other tags scroll. Item counts live inside the tags
+The header uses the Wantio mark, a Wishlist/Purchased list selector, tag filters,
+an expandable search, one Add item button and a More options disclosure. Settings,
+extension help and sign out live in that disclosure. There is no bottom navigation.
+Desktop controls share one row; mobile tags occupy a second row. On mobile an open
+search takes the place of the logo/list selector to make room for typing. Search
+stays expanded while a query exists; clear/close restores focus to its trigger.
+Escape closes an empty search. The More options disclosure closes on Escape or
+outside pointer interaction. Sign out uses the existing POST endpoint.
+
+The wishlist title remains available to assistive technology without a visible
+heading. All remains fixed while other tags scroll. Counts live inside the tags
 and reflect the current search.
 
 All is the default, one tag can be selected at a time, and tag selection combines

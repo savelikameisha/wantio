@@ -1,10 +1,10 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { Heart, Plus, Search } from "lucide-react";
+import { Heart, Plus, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { WorkspaceNav } from "@/components/workspace-nav";
+import { WorkspaceNav, WorkspaceMenu } from "@/components/workspace-nav";
 import { TagFilters } from "@/components/tag-filters";
 import { useWorkspaceNavigation } from "@/hooks/use-workspace-navigation";
 import { ProductCard } from "@/components/product-card";
@@ -26,7 +26,10 @@ export function WishlistDashboard({
   profile: Profile | null;
 }) {
   const navigation = useWorkspaceNavigation();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchTrigger = useRef<HTMLButtonElement>(null);
   const { view: activeView, search, itemId: detailId } = navigation;
+  const expandedSearch = activeView === "wishlist" && (searchOpen || !!search);
   const filter = initialTags.some((t) => t.id === navigation.tag)
     ? navigation.tag
     : "";
@@ -84,13 +87,7 @@ export function WishlistDashboard({
         Skip to content
       </a>
       <header className="sticky top-0 z-30 border-b border-border/60 bg-background/95 backdrop-blur">
-        <div
-          className={
-            activeView === "wishlist"
-              ? "mx-auto grid max-w-7xl grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 px-4 py-3 md:grid-cols-[auto_auto_minmax(100px,160px)_minmax(100px,1fr)_auto]"
-              : "mx-auto flex max-w-7xl items-center gap-3 px-4 py-3"
-          }
-        >
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-1 px-3 py-3 md:flex-nowrap md:gap-2">
           <a
             href={navigation.hrefFor("wishlist")}
             onClick={(e) => {
@@ -99,60 +96,98 @@ export function WishlistDashboard({
               navigation.changeView("wishlist");
             }}
             aria-label="Wantio home"
-            className="flex h-11 w-11 shrink-0 items-center justify-center"
+            className={`${expandedSearch ? "hidden md:flex" : "flex"} h-11 w-11 shrink-0 items-center justify-center`}
           >
             <img src="/icon.svg" alt="" className="h-8 w-8" />
           </a>
-          <WorkspaceNav
-            activeView={activeView}
-            onNavigate={navigation.changeView}
-            hrefFor={navigation.hrefFor}
-            onAddItem={() => setModal({})}
-          />
+          <div className={expandedSearch ? "hidden md:block" : "block"}>
+            <WorkspaceNav
+              activeView={activeView}
+              onNavigate={navigation.changeView}
+            />
+          </div>
           {activeView === "wishlist" && (
-            <>
-              <label className="relative block min-w-0">
-                <span className="sr-only">Search wishlist</span>
-                <Search
-                  aria-hidden
-                  className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground"
-                />
-                <Input
-                  type="search"
-                  className="border-transparent bg-muted/60 pl-10 shadow-none"
-                  placeholder="Search"
-                  value={search}
-                  onChange={(e) => {
-                    navigation.searchFor(e.target.value);
-                    setLimit(48);
-                  }}
-                />
-              </label>
-              <div className="col-span-2 min-w-0 pt-1 md:col-span-1 md:pt-0">
-                <TagFilters
-                  tags={initialTags}
-                  value={filter}
-                  counts={tagCounts}
-                  allCount={matching.length}
-                  onChange={(id) => {
-                    navigation.filterBy(id);
-                    setLimit(48);
-                  }}
-                />
-              </div>
-            </>
+            <div className="order-2 w-full min-w-0 md:order-none md:w-auto md:flex-1">
+              <TagFilters
+                tags={initialTags}
+                value={filter}
+                counts={tagCounts}
+                allCount={matching.length}
+                onChange={(id) => {
+                  navigation.filterBy(id);
+                  setLimit(48);
+                }}
+              />
+            </div>
           )}
-          <Button
-            className="ml-auto hidden md:inline-flex"
-            onClick={() => setModal({})}
-            aria-label="Add item"
-          >
-            <Plus />
-            <span className="hidden xl:inline">Add item</span>
-          </Button>
+          {activeView === "wishlist" && (searchOpen || !!search) && (
+            <div className="order-first flex min-w-0 flex-1 items-center gap-1 md:order-none md:w-48 md:flex-none">
+              <Input
+                id="workspace-search"
+                aria-label="Search wishlist"
+                type="search"
+                placeholder="Search"
+                autoComplete="off"
+                className="min-w-0 bg-muted/60 shadow-none"
+                value={search}
+                onChange={(e) => {
+                  navigation.searchFor(e.target.value);
+                  setLimit(48);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape" && !search) {
+                    setSearchOpen(false);
+                    requestAnimationFrame(() => searchTrigger.current?.focus());
+                  }
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={search ? "Clear search" : "Close search"}
+                onClick={() => {
+                  navigation.searchFor("");
+                  setSearchOpen(false);
+                  requestAnimationFrame(() => searchTrigger.current?.focus());
+                }}
+              >
+                <X />
+              </Button>
+            </div>
+          )}
+          <div className="ml-auto flex items-center gap-1">
+            {activeView === "wishlist" && (
+              <Button
+                ref={searchTrigger}
+                className={expandedSearch ? "hidden" : undefined}
+                variant="ghost"
+                size="icon"
+                aria-label="Open search"
+                aria-expanded={searchOpen || !!search}
+                onClick={() => {
+                  setSearchOpen(true);
+                  requestAnimationFrame(() =>
+                    document.getElementById("workspace-search")?.focus(),
+                  );
+                }}
+              >
+                <Search />
+              </Button>
+            )}
+            <Button
+              size="icon"
+              aria-label="Add item"
+              onClick={() => setModal({})}
+            >
+              <Plus />
+            </Button>
+            <WorkspaceMenu
+              onSettings={() => navigation.changeView("settings")}
+            />
+          </div>
         </div>
       </header>
-      <main id="main" className="max-w-6xl mx-auto px-4 py-6 pb-28 md:pb-10">
+      <main id="main" className="max-w-6xl mx-auto px-4 py-6 pb-10">
         {error && (
           <div
             role="alert"
@@ -229,13 +264,6 @@ export function WishlistDashboard({
           />
         )}
       </main>
-      <WorkspaceNav
-        mobile
-        activeView={activeView}
-        onNavigate={navigation.changeView}
-        hrefFor={navigation.hrefFor}
-        onAddItem={() => setModal({})}
-      />
       {modal && (
         <AddItemModal
           key={modal.item?.id || "new"}

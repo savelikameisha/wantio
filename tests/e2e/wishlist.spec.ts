@@ -107,19 +107,15 @@ test("save, edit, purchase, restore, share privately, and delete", async ({
     await expect(
       page.getByRole("heading", { name: /Your wishlist/ }),
     ).toBeVisible();
-    await page
-      .getByRole("link", { name: "Settings", exact: true })
-      .filter({ visible: true })
-      .click();
+    await page.locator('summary[aria-label="More options"]').click();
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
     await page.getByLabel("New tag").fill("Home");
     await page.getByRole("button", { name: "Add", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "Delete tag Home" }),
     ).toBeVisible();
-    await page
-      .getByRole("link", { name: "Wishlist", exact: true })
-      .filter({ visible: true })
-      .click();
+    await page.getByRole("combobox", { name: "Choose list" }).click();
+    await page.getByRole("option", { name: "Wishlist", exact: true }).click();
     await page
       .getByRole("button", { name: "Add item", exact: true })
       .filter({ visible: true })
@@ -159,18 +155,14 @@ test("save, edit, purchase, restore, share privately, and delete", async ({
     await expect(
       page.getByRole("button", { name: "View Edited chair" }),
     ).toHaveCount(0);
-    await page
-      .getByRole("link", { name: "Purchased", exact: true })
-      .filter({ visible: true })
-      .click();
+    await page.getByRole("combobox", { name: "Choose list" }).click();
+    await page.getByRole("option", { name: "Purchased", exact: true }).click();
     await expect(page.getByText("Spent · PLN")).toBeVisible();
     await page.getByRole("button", { name: "View Edited chair" }).click();
     await dialog.getByRole("button", { name: "Move back to wishlist" }).click();
     await expect(dialog).toBeHidden();
-    await page
-      .getByRole("link", { name: "Settings", exact: true })
-      .filter({ visible: true })
-      .click();
+    await page.locator('summary[aria-label="More options"]').click();
+    await page.getByRole("button", { name: "Settings", exact: true }).click();
     await page.getByLabel("Allow viewing with a link").check();
     await expect(page.getByLabel("Allow viewing with a link")).toBeEnabled();
     const link = await page.getByLabel("Wishlist share link").inputValue();
@@ -189,10 +181,8 @@ test("save, edit, purchase, restore, share privately, and delete", async ({
     } finally {
       await guest.close();
     }
-    await page
-      .getByRole("link", { name: "Wishlist", exact: true })
-      .filter({ visible: true })
-      .click();
+    await page.getByRole("combobox", { name: "Choose list" }).click();
+    await page.getByRole("option", { name: "Wishlist", exact: true }).click();
     await page.getByRole("button", { name: "View Edited chair" }).click();
     page.once("dialog", (d) => d.accept());
     await dialog

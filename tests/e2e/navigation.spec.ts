@@ -93,16 +93,31 @@ test("navigation preserves filters, browser history and item focus on desktop an
     for (const width of [1440, 768, 390]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto("/");
-      const nav = page.getByRole("navigation", {
-        name: width === 390 ? "Mobile navigation" : "Main navigation",
-        exact: true,
-      });
-      await expect(nav).toBeVisible();
+      await expect(
+        page.getByRole("combobox", { name: "Choose list" }),
+      ).toBeVisible();
       await expect(
         page
           .getByRole("button", { name: "Add item", exact: true })
           .filter({ visible: true }),
       ).toHaveCount(1);
+      const more = page.locator('summary[aria-label="More options"]');
+      await more.focus();
+      await page.keyboard.press("Enter");
+      await expect(
+        page.getByRole("button", { name: "Settings", exact: true }),
+      ).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(more).toBeFocused();
+      await expect(
+        page.getByRole("button", { name: "Settings", exact: true }),
+      ).toBeHidden();
+      await page.getByRole("button", { name: "Open search" }).click();
+      await expect(page.getByRole("searchbox")).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(
+        page.getByRole("button", { name: "Open search" }),
+      ).toBeFocused();
       const allFilter = page.getByRole("button", { name: "All", exact: true });
       await expect(allFilter).toContainText("24");
       await expect(
@@ -123,6 +138,8 @@ test("navigation preserves filters, browser history and item focus on desktop an
       else expect(tagsBox!.y).toBeGreaterThan(logoBox!.y + logoBox!.height);
       await page.getByRole("button", { name: "Books", exact: true }).click();
       await expect(page.getByRole("button", { name: /^View / })).toHaveCount(2);
+      await page.getByRole("button", { name: "Open search" }).click();
+      await expect(page.getByRole("searchbox")).toBeFocused();
       await page
         .getByRole("searchbox", { name: "Search wishlist" })
         .fill("Book 0");
@@ -144,7 +161,8 @@ test("navigation preserves filters, browser history and item focus on desktop an
       await expect(page.getByRole("dialog")).toBeVisible();
       await page.goBack();
       await expect(page.getByRole("dialog")).toBeHidden();
-      await nav.getByRole("link", { name: "Settings", exact: true }).click();
+      await page.locator('summary[aria-label="More options"]').click();
+      await page.getByRole("button", { name: "Settings", exact: true }).click();
       await expect(
         page.getByRole("heading", { name: "Settings", exact: true }),
       ).toBeVisible();
@@ -195,6 +213,8 @@ test("navigation preserves filters, browser history and item focus on desktop an
           () => document.documentElement.scrollWidth <= innerWidth,
         ),
       ).toBe(true);
+      if (await page.getByRole("button", { name: "Close search" }).isVisible())
+        await page.getByRole("button", { name: "Close search" }).click();
       await page.evaluate(() => scrollTo(0, 0));
       await page.screenshot({ path: `test-results/navigation-${width}.png` });
     }
